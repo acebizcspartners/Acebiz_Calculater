@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Australian Property CGT Calculator - Tax Planning Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.95;
+        }
+
+        .nav-tabs {
+            display: flex;
+            background: #ecf0f1;
+            border-bottom: 2px solid #bdc3c7;
+            overflow-x: auto;
+        }
+
+        .nav-tab {
+            padding: 15px 25px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            color: #7f8c8d;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            position: relative;
+        }
+
+        .nav-tab:hover {
+            background: #fff;
+            color: #2c3e50;
+        }
+
+        .nav-tab.active {
+            background: white;
+            color: #2980b9;
+            border-bottom: 3px solid #2980b9;
+            margin-bottom: -2px;
+        }
+
+        .tab-content {
+            padding: 30px;
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .form-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+
+        .form-section h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #34495e;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            padding: 12px;
+            border: 2px solid #dfe6e9;
+            border-radius: 8px;
+            font-size: 15px;
+            transition: border-color 0.3s ease;
+            background-color: white;
+            color: #333;
+        }
+
+        .form-group select option {
+            background-color: white;
+            color: #333;
+            padding: 5px;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .form-group .help-text {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+
+        .currency-input {
+            position: relative;
+        }
+
+        .currency-input::before {
+            content: '$';
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #7f8c8d;
+            font-weight: 600;
+        }
+
+        .currency-input input {
+            padding-left: 25px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(39, 174, 96, 0.3);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+            color: white;
+        }
+
+        .results-section {
+            margin-top: 30px;
+        }
+
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .summary-card {
+            background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            border: 2px solid #e9ecef;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .summary-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #3498db, #2ecc71, #f39c12);
+        }
+
+        .summary-card h4 {
+            color: #7f8c8d;
+            font-size: 13px;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .summary-card .value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .summary-card .change {
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+
+        .summary-card.highlight {
+            background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+            border-color: #4caf50;
+        }
+
+        .summary-card.highlight::before {
+            background: #4caf50;
+        }
+
+        .summary-card.warning {
+            background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+            border-color: #ff9800;
+        }
+
+        .summary-card.warning::before {
+            background: #ff9800;
+        }
+
+        .strategy-section {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border-radius: 15px;
+            padding: 25px;
+            margin: 25px 0;
+            border: 2px solid #2196f3;
+        }
+
+        .strategy-section h3 {
+            color: #1565c0;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .strategy-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: start;
+            gap: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .strategy-icon {
+            width: 40px;
+            height: 40px;
+            background: #2196f3;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .strategy-content {
+            flex: 1;
+        }
+
+        .strategy-content h4 {
+            color: #1565c0;
+            margin-bottom: 5px;
+        }
+
+        .strategy-content p {
+            color: #616161;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .strategy-savings {
+            background: #4caf50;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .scenario-comparison {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 25px 0;
+        }
+
+        .scenario-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            border: 2px solid #e9ecef;
+            position: relative;
+        }
+
+        .scenario-card.best {
+            border-color: #4caf50;
+            background: linear-gradient(135deg, #f1f8e9 0%, #dcedc8 100%);
+        }
+
+        .scenario-badge {
+            position: absolute;
+            top: -12px;
+            right: 20px;
+            background: #4caf50;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+        }
+
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid #dee2e6;
+            border-radius: 50%;
+            border-top-color: #3498db;
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .alert-info {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            color: #1565c0;
+        }
+
+        .alert-warning {
+            background: #fff3e0;
+            border-left: 4px solid #ff9800;
+            color: #e65100;
+        }
+
+        .alert-success {
+            background: #e8f5e9;
+            border-left: 4px solid #4caf50;
+            color: #2e7d32;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background: white;
+            margin: 50px auto;
+            padding: 30px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-close {
+            font-size: 30px;
+            cursor: pointer;
+            color: #7f8c8d;
+            transition: color 0.3s ease;
+        }
+
+        .modal-close:hover {
+            color: #2c3e50;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 15px;
+            }
+
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .nav-tabs {
+                overflow-x: scroll;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .summary-cards {
+                grid-template-columns: 1fr;
+            }
+
+            .scenario-comparison {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media print {
+            body {
+                background: white;
+            }
+
+            .nav-tabs,
+            .btn,
+            .modal {
+                display: none;
+            }
+
+            .container {
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏡 Australian Property CGT Calculator</h1>
+            <p>Professional Tax Planning & Capital Gains Calculation Tool</p>
+        </div>
+
+        <div class="nav-tabs">
+            <button class="nav-tab active" data-tab="calculator">Calculator</button>
+            <button class="nav-tab" data-tab="scenarios">Tax Scenarios</button>
+            <button class="nav-tab" data-tab="strategies">Tax Strategies</button>
+            <button class="nav-tab" data-tab="reports">Reports</button>
+            <button class="nav-tab" data-tab="settings">Settings</button>
+        </div>
+
+        <!-- Calculator Tab -->
+        <div class="tab-content active" id="calculator-tab">
+            <div class="form-section">
+                <h3>📍 Property Details</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="propertyAddress">Property Address *</label>
+                        <input type="text" id="propertyAddress" placeholder="123 Main Street, Sydney NSW 2000">
+                    </div>
+                    <div class="form-group">
+                        <label for="propertyType">Property Type *</label>
+                        <select id="propertyType">
+                            <option value="house">House</option>
+                            <option value="unit">Unit/Apartment</option>
+                            <option value="townhouse">Townhouse</option>
+                            <option value="land">Vacant Land</option>
+                            <option value="commercial">Commercial Property</option>
+                            <option value="investment">Investment Property</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3>💰 Purchase Information</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="purchaseDate">Contract Date *</label>
+                        <input type="date" id="purchaseDate">
+                        <span class="help-text">Date of purchase contract</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="settlementDatePurchase">Settlement Date</label>
+                        <input type="date" id="settlementDatePurchase">
+                        <span class="help-text">Optional: for precise CGT calculation</span>
+                    </div>
+                    <div class="form-group currency-input">
+                        <label for="purchasePrice">Purchase Price *</label>
+                        <input type="number" id="purchasePrice" placeholder="0.00" step="0.01">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group currency-input">
+                        <label for="stampDuty">Stamp Duty</label>
+                        <input type="number" id="stampDuty" placeholder="0.00" step="0.01">
+                    </div>
+                    <div class="form-group currency-input">
+                        <label for="legalFeesPurchase">Legal Fees (Purchase)</label>
+                        <input type="number" id="legalFeesPurchase" placeholder="0.00" step="0.01">
+                    </div>
+                    <div class="form-group currency-input">
+                        <label for="otherPurchaseCosts">Other Purchase Costs</label>
+                        <input type="number" id="otherPurchaseCosts" placeholder="0.00" step="0.01">
+                        <span class="help-text">Building/pest inspections, etc.</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3>🔨 Capital Improvements</h3>
+                <div id="improvementsContainer">
+                    <div class="form-row improvement-row">
+                        <div class="form-group">
+                            <label>Description</label>
+                            <input type="text" class="improvement-desc" placeholder="e.g., Kitchen renovation">
+                        </div>
+                        <div class="form-group">
+                            <label>Date</label>
+                            <input type="date" class="improvement-date">
+                        </div>
+                        <div class="form-group currency-input">
+                            <label>Cost</label>
+                            <input type="number" class="improvement-cost" placeholder="0.00" step="0.01">
+                        </div>
+                    </div>
+                </div>
+                <button class="btn btn-secondary" onclick="addImprovementRow()">+ Add Improvement</button>
+            </div>
+
+            <div class="form-section">
+                <h3>💵 Sale Information</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="saleDate">Contract Date (or Estimated) *</label>
+                        <input type="date" id="saleDate">
+                    </div>
+                    <div class="form-group">
+                        <label for="settlementDateSale">Settlement Date</label>
+                        <input type="date" id="settlementDateSale">
+                    </div>
+                    <div class="form-group currency-input">
+                        <label for="salePrice">Sale Price (or Estimated) *</label>
+                        <input type="number" id="salePrice" placeholder="0.00" step="0.01">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group currency-input">
+                        <label for="agentCommission">Agent Commission</label>
+                        <input type="number" id="agentCommission" placeholder="0.00" step="0.01">
+                        <span class="help-text">Including GST</span>
+                    </div>
+                    <div class="form-group currency-input">
+                        <label for="marketingCosts">Marketing Costs</label>
+                        <input type="number" id="marketingCosts" placeholder="0.00" step="0.01">
+                    </div>
+                    <div class="form-group currency-input">
+                        <label for="legalFeesSale">Legal Fees (Sale)</label>
+                        <input type="number" id="legalFeesSale" placeholder="0.00" step="0.01">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3>🏠 Main Residence Exemption</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="mainResidence">Main Residence Status</label>
+                        <select id="mainResidence" onchange="toggleMainResidenceDetails()">
+                            <option value="never">Never Main Residence</option>
+                            <option value="always">Always Main Residence</option>
+                            <option value="partial">Partial Main Residence</option>
+                            <option value="six-year">Six Year Rule Applies</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="mainResidenceDetails" class="hidden">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="movedInDate">Date Moved In</label>
+                            <input type="date" id="movedInDate">
+                        </div>
+                        <div class="form-group">
+                            <label for="movedOutDate">Date Moved Out</label>
+                            <input type="date" id="movedOutDate">
+                        </div>
+                        <div class="form-group">
+                            <label for="incomeProducingDays">Days Income Producing</label>
+                            <input type="number" id="incomeProducingDays" placeholder="0" min="0">
+                        </div>
+                    </div>
+                    <div class="alert alert-info">
+                        <span>ℹ️</span>
+                        <span>The six-year rule allows you to treat a property as your main residence for up to 6 years while renting it out, provided you don't treat another property as your main residence during this time.</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3>⚙️ Tax Settings</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="taxYear">Tax Year</label>
+                        <select id="taxYear">
+                            <option value="2024-25">2024-25</option>
+                            <option value="2023-24">2023-24</option>
+                            <option value="2022-23">2022-23</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="marginalTaxRate">Your Marginal Tax Rate</label>
+                        <select id="marginalTaxRate">
+                            <option value="0">Tax Free (0%)</option>
+                            <option value="0.19">$18,201 – $45,000 (19%)</option>
+                            <option value="0.325">$45,001 – $120,000 (32.5%)</option>
+                            <option value="0.37">$120,001 – $180,000 (37%)</option>
+                            <option value="0.45">$180,001+ (45%)</option>
+                        </select>
+                        <span class="help-text">Used for tax impact calculations</span>
+                    </div>
+                    <div class="form-group">
+                        <label for="capitalLosses">Available Capital Losses</label>
+                        <div class="currency-input">
+                            <input type="number" id="capitalLosses" placeholder="0.00" step="0.01">
+                        </div>
+                        <span class="help-text">From shares or other assets</span>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 15px; justify-content: center; margin-top: 30px;">
+                <button class="btn btn-primary" onclick="calculateCGT()">
+                    <span>📊</span>Calculate CGT
+                </button>
+                <button class="btn btn-secondary" onclick="clearForm()">
+                    <span>🔄</span>Clear Form
+                </button>
+                <button class="btn btn-warning" onclick="loadSampleData()">
+                    <span>📝</span>Load Sample
+                </button>
+            </div>
+
+            <div id="resultsSection" class="results-section hidden">
+                <h2 style="margin-bottom: 25px; color: #2c3e50;">📈 Capital Gains Tax Calculation Results</h2>
+
+                <div class="summary-cards">
+                    <div class="summary-card">
+                        <h4>Gross Capital Gain</h4>
+                        <div class="value" id="grossGain">$0</div>
+                        <div class="change" id="grossGainPercent">0%</div>
+                    </div>
+                    <div class="summary-card">
+                        <h4>Total Cost Base</h4>
+                        <div class="value" id="costBase">$0</div>
+                        <div class="change">Incl. all costs</div>
+                    </div>
+                    <div class="summary-card">
+                        <h4>MRE Exemption</h4>
+                        <div class="value" id="mreExemption">$0</div>
+                        <div class="change" id="mrePercent">0%</div>
+                    </div>
+                    <div class="summary-card">
+                        <h4>CGT Discount (50%)</h4>
+                        <div class="value" id="cgtDiscount">$0</div>
+                        <div class="change" id="holdingPeriod">0 days</div>
+                    </div>
+                    <div class="summary-card highlight">
+                        <h4>Taxable Capital Gain</h4>
+                        <div class="value" id="taxableGain">$0</div>
+                        <div class="change">After all exemptions</div>
+                    </div>
+                    <div class="summary-card warning">
+                        <h4>Estimated Tax Payable</h4>
+                        <div class="value" id="taxPayable">$0</div>
+                        <div class="change" id="effectiveRate">0% effective</div>
+                    </div>
+                </div>
+
+
+                <div class="strategy-section">
+                    <h3>💡 Tax Optimization Strategies</h3>
+                    <div id="strategiesContainer">
+                        <!-- Strategies will be dynamically inserted here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tax Scenarios Tab -->
+        <div class="tab-content" id="scenarios-tab">
+            <h2>📊 Tax Planning Scenarios</h2>
+            <div class="alert alert-info">
+                <span>ℹ️</span>
+                <span>Scenario planning features coming soon. Use the main calculator to test different sale prices and dates.</span>
+            </div>
+        </div>
+
+        <!-- Tax Strategies Tab -->
+        <div class="tab-content" id="strategies-tab">
+            <h2>🎯 Advanced Tax Strategies</h2>
+
+            <div class="strategy-section">
+                <h3>📅 Timing Strategies</h3>
+                <div class="strategy-item">
+                    <div class="strategy-icon">📆</div>
+                    <div class="strategy-content">
+                        <h4>Defer Sale to Next Financial Year</h4>
+                        <p>If you expect lower income next year, deferring the sale could reduce your marginal tax rate and save thousands in CGT.</p>
+                    </div>
+                    <div class="strategy-savings">Save up to $15,000</div>
+                </div>
+
+                <div class="strategy-item">
+                    <div class="strategy-icon">⏰</div>
+                    <div class="strategy-content">
+                        <h4>Hold for 12+ Months</h4>
+                        <p>Ensure you qualify for the 50% CGT discount by holding the property for at least 12 months from contract date.</p>
+                    </div>
+                    <div class="strategy-savings">Save 50% on CGT</div>
+                </div>
+            </div>
+
+            <div class="strategy-section">
+                <h3>🏠 Main Residence Strategies</h3>
+                <div class="strategy-item">
+                    <div class="strategy-icon">🏡</div>
+                    <div class="strategy-content">
+                        <h4>Six-Year Rule</h4>
+                        <p>Rent out your main residence for up to 6 years while maintaining full CGT exemption, provided you don't claim another main residence.</p>
+                    </div>
+                </div>
+
+                <div class="strategy-item">
+                    <div class="strategy-icon">📍</div>
+                    <div class="strategy-content">
+                        <h4>Move In Before Sale</h4>
+                        <p>Consider moving into an investment property as your main residence before selling to access partial exemption.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="strategy-section">
+                <h3>💰 Cost Base Strategies</h3>
+                <div class="strategy-item">
+                    <div class="strategy-icon">🔨</div>
+                    <div class="strategy-content">
+                        <h4>Capital Improvements</h4>
+                        <p>Complete renovations before sale to increase your cost base and reduce capital gains.</p>
+                    </div>
+                </div>
+
+                <div class="strategy-item">
+                    <div class="strategy-icon">📋</div>
+                    <div class="strategy-content">
+                        <h4>Document All Costs</h4>
+                        <p>Ensure you claim all eligible costs including stamp duty, legal fees, and selling expenses.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports Tab -->
+        <div class="tab-content" id="reports-tab">
+            <h2>📄 Professional Reports</h2>
+
+            <div class="form-section">
+                <h3>Generate Client Reports</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="clientName">Client Name</label>
+                        <input type="text" id="clientName" placeholder="John Smith">
+                    </div>
+                    <div class="form-group">
+                        <label for="reportType">Report Type</label>
+                        <select id="reportType">
+                            <option value="summary">Executive Summary</option>
+                            <option value="detailed">Detailed CGT Report</option>
+                            <option value="strategy">Tax Planning Strategy</option>
+                            <option value="ato">ATO Compliance Report</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 15px; margin-top: 20px;">
+                    <button class="btn btn-primary" onclick="generateReport()">
+                        <span>📄</span>Generate Report
+                    </button>
+                    <button class="btn btn-success" onclick="exportToExcel()">
+                        <span>📊</span>Export to Excel
+                    </button>
+                    <button class="btn btn-secondary" onclick="printReport()">
+                        <span>🖨️</span>Print Report
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Settings Tab -->
+        <div class="tab-content" id="settings-tab">
+            <h2>⚙️ Settings & Configuration</h2>
+
+            <div class="form-section">
+                <h3>Tax Rates (2024-25)</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>CGT Discount Rate</label>
+                        <input type="number" value="50" disabled> %
+                        <span class="help-text">For individuals and trusts</span>
+                    </div>
+                    <div class="form-group">
+                        <label>Company Tax Rate</label>
+                        <input type="number" value="30" disabled> %
+                        <span class="help-text">No CGT discount for companies</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h3>Data Management</h3>
+                <div style="display: flex; gap: 15px;">
+                    <button class="btn btn-primary" onclick="saveData()">
+                        <span>💾</span>Save Current Data
+                    </button>
+                    <button class="btn btn-secondary" onclick="loadData()">
+                        <span>📂</span>Load Saved Data
+                    </button>
+                    <button class="btn btn-warning" onclick="importExcel()">
+                        <span>📥</span>Import from Excel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for detailed information -->
+    <div id="infoModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Information</h2>
+                <span class="modal-close" onclick="closeModal()">&times;</span>
+            </div>
+            <div id="modalBody">
+                <!-- Content will be dynamically inserted -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tab navigation
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                const targetTab = this.dataset.tab;
+
+                // Update active tab
+                document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+
+                // Show corresponding content
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                document.getElementById(`${targetTab}-tab`).classList.add('active');
+            });
+        });
+
+        // Main CGT calculation function
+        function calculateCGT() {
+            // Get all input values
+            const purchasePrice = parseFloat(document.getElementById('purchasePrice').value) || 0;
+            const salePrice = parseFloat(document.getElementById('salePrice').value) || 0;
+            const stampDuty = parseFloat(document.getElementById('stampDuty').value) || 0;
+            const legalFeesPurchase = parseFloat(document.getElementById('legalFeesPurchase').value) || 0;
+            const otherPurchaseCosts = parseFloat(document.getElementById('otherPurchaseCosts').value) || 0;
+            const agentCommission = parseFloat(document.getElementById('agentCommission').value) || 0;
+            const marketingCosts = parseFloat(document.getElementById('marketingCosts').value) || 0;
+            const legalFeesSale = parseFloat(document.getElementById('legalFeesSale').value) || 0;
+            const capitalLosses = parseFloat(document.getElementById('capitalLosses').value) || 0;
+
+            // Calculate improvements total
+            let improvementsTotal = 0;
+            document.querySelectorAll('.improvement-cost').forEach(input => {
+                improvementsTotal += parseFloat(input.value) || 0;
+            });
+
+            // Calculate cost base
+            const costBase = purchasePrice + stampDuty + legalFeesPurchase + otherPurchaseCosts +
+                            improvementsTotal + agentCommission + marketingCosts + legalFeesSale;
+
+            // Calculate gross capital gain
+            const grossCapitalGain = salePrice - costBase;
+
+            // Calculate holding period
+            const purchaseDate = new Date(document.getElementById('purchaseDate').value);
+            const saleDate = new Date(document.getElementById('saleDate').value);
+            const holdingDays = Math.floor((saleDate - purchaseDate) / (1000 * 60 * 60 * 24));
+            const eligible50Discount = holdingDays >= 365;
+
+            // Calculate Main Residence Exemption
+            const mainResidenceStatus = document.getElementById('mainResidence').value;
+            let mrePercentage = 0;
+            let mreExemption = 0;
+
+            if (mainResidenceStatus === 'always') {
+                mrePercentage = 100;
+            } else if (mainResidenceStatus === 'partial' || mainResidenceStatus === 'six-year') {
+                // Calculate partial exemption
+                const movedInDate = document.getElementById('movedInDate').value;
+                const movedOutDate = document.getElementById('movedOutDate').value;
+                if (movedInDate && movedOutDate) {
+                    const residenceDays = Math.floor((new Date(movedOutDate) - new Date(movedInDate)) / (1000 * 60 * 60 * 24));
+                    mrePercentage = Math.min(100, (residenceDays / holdingDays) * 100);
+                }
+            }
+
+            mreExemption = grossCapitalGain * (mrePercentage / 100);
+            const gainAfterMRE = grossCapitalGain - mreExemption;
+
+            // Apply 50% CGT discount if eligible
+            let cgtDiscountAmount = 0;
+            if (eligible50Discount && gainAfterMRE > 0) {
+                cgtDiscountAmount = gainAfterMRE * 0.5;
+            }
+
+            // Apply capital losses
+            let taxableGain = gainAfterMRE - cgtDiscountAmount - capitalLosses;
+            taxableGain = Math.max(0, taxableGain);
+
+            // Calculate tax payable
+            const marginalRate = parseFloat(document.getElementById('marginalTaxRate').value) || 0;
+            const taxPayable = taxableGain * marginalRate;
+
+            // Update results display
+            document.getElementById('grossGain').textContent = formatCurrency(grossCapitalGain);
+            document.getElementById('grossGainPercent').textContent = `${((grossCapitalGain / purchasePrice) * 100).toFixed(1)}% return`;
+            document.getElementById('costBase').textContent = formatCurrency(costBase);
+            document.getElementById('mreExemption').textContent = formatCurrency(mreExemption);
+            document.getElementById('mrePercent').textContent = `${mrePercentage.toFixed(1)}% exempt`;
+            document.getElementById('cgtDiscount').textContent = formatCurrency(cgtDiscountAmount);
+            document.getElementById('holdingPeriod').textContent = `${holdingDays} days held`;
+            document.getElementById('taxableGain').textContent = formatCurrency(taxableGain);
+            document.getElementById('taxPayable').textContent = formatCurrency(taxPayable);
+            document.getElementById('effectiveRate').textContent = `${((taxPayable / grossCapitalGain) * 100).toFixed(1)}% effective`;
+
+            // Show results section
+            document.getElementById('resultsSection').classList.remove('hidden');
+
+            // Generate strategies
+            generateStrategies(grossCapitalGain, taxableGain, holdingDays, mrePercentage);
+        }
+
+        // Generate tax strategies based on calculation
+        function generateStrategies(grossGain, taxableGain, holdingDays, mrePercent) {
+            const strategiesContainer = document.getElementById('strategiesContainer');
+            strategiesContainer.innerHTML = '';
+
+            const strategies = [];
+
+            // Check if holding period strategy applies
+            if (holdingDays < 365 && holdingDays > 300) {
+                const daysToWait = 365 - holdingDays;
+                const potentialSaving = taxableGain * 0.5;
+                strategies.push({
+                    icon: '⏰',
+                    title: `Wait ${daysToWait} more days for 50% CGT discount`,
+                    description: `Holding for 12+ months will qualify you for the 50% CGT discount.`,
+                    saving: formatCurrency(potentialSaving)
+                });
+            }
+
+            // Main residence strategies
+            if (mrePercent < 100 && mrePercent > 0) {
+                strategies.push({
+                    icon: '🏠',
+                    title: 'Maximize Main Residence Exemption',
+                    description: 'Consider documenting all periods of actual residence to increase your exemption percentage.',
+                    saving: 'Variable'
+                });
+            }
+
+            // Timing strategies
+            if (new Date().getMonth() >= 3) { // After March
+                strategies.push({
+                    icon: '📅',
+                    title: 'Consider deferring to next financial year',
+                    description: 'If you expect lower income next year, deferring could reduce your tax rate.',
+                    saving: 'Up to 13% rate reduction'
+                });
+            }
+
+            // Cost base strategies
+            strategies.push({
+                icon: '📋',
+                title: 'Document all eligible costs',
+                description: 'Ensure you\'ve included all purchase costs, improvements, and selling expenses.',
+                saving: 'Reduces taxable gain'
+            });
+
+            // Display strategies
+            strategies.forEach(strategy => {
+                const strategyDiv = document.createElement('div');
+                strategyDiv.className = 'strategy-item';
+                strategyDiv.innerHTML = `
+                    <div class="strategy-icon">${strategy.icon}</div>
+                    <div class="strategy-content">
+                        <h4>${strategy.title}</h4>
+                        <p>${strategy.description}</p>
+                    </div>
+                    ${strategy.saving ? `<div class="strategy-savings">${strategy.saving}</div>` : ''}
+                `;
+                strategiesContainer.appendChild(strategyDiv);
+            });
+        }
+
+
+        // Add improvement row
+        function addImprovementRow() {
+            const container = document.getElementById('improvementsContainer');
+            const newRow = document.createElement('div');
+            newRow.className = 'form-row improvement-row';
+            newRow.innerHTML = `
+                <div class="form-group">
+                    <label>Description</label>
+                    <input type="text" class="improvement-desc" placeholder="e.g., Kitchen renovation">
+                </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" class="improvement-date">
+                </div>
+                <div class="form-group currency-input">
+                    <label>Cost</label>
+                    <input type="number" class="improvement-cost" placeholder="0.00" step="0.01">
+                </div>
+            `;
+            container.appendChild(newRow);
+        }
+
+        // Toggle main residence details
+        function toggleMainResidenceDetails() {
+            const status = document.getElementById('mainResidence').value;
+            const details = document.getElementById('mainResidenceDetails');
+
+            if (status === 'partial' || status === 'six-year') {
+                details.classList.remove('hidden');
+            } else {
+                details.classList.add('hidden');
+            }
+        }
+
+        // Format currency
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('en-AU', {
+                style: 'currency',
+                currency: 'AUD',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(amount);
+        }
+
+        // Load sample data
+        function loadSampleData() {
+            document.getElementById('propertyAddress').value = '123 Main Street, Sydney NSW 2000';
+            document.getElementById('propertyType').value = 'house';
+            document.getElementById('purchaseDate').value = '2019-03-15';
+            document.getElementById('purchasePrice').value = '850000';
+            document.getElementById('stampDuty').value = '33000';
+            document.getElementById('legalFeesPurchase').value = '2500';
+            document.getElementById('saleDate').value = '2024-11-15';
+            document.getElementById('salePrice').value = '1250000';
+            document.getElementById('agentCommission').value = '25000';
+            document.getElementById('marketingCosts').value = '5000';
+            document.getElementById('legalFeesSale').value = '2000';
+            document.getElementById('mainResidence').value = 'partial';
+            document.getElementById('marginalTaxRate').value = '0.37';
+
+            // Add a sample improvement
+            const firstImprovement = document.querySelector('.improvement-cost');
+            if (firstImprovement) {
+                firstImprovement.value = '45000';
+                document.querySelector('.improvement-desc').value = 'Kitchen renovation';
+                document.querySelector('.improvement-date').value = '2021-06-15';
+            }
+        }
+
+        // Clear form
+        function clearForm() {
+            document.querySelectorAll('input').forEach(input => {
+                if (input.type !== 'button' && input.type !== 'submit') {
+                    input.value = '';
+                }
+            });
+            document.querySelectorAll('select').forEach(select => {
+                select.selectedIndex = 0;
+            });
+            document.getElementById('resultsSection').classList.add('hidden');
+        }
+
+        // Export to Excel
+        function exportToExcel() {
+            // Create workbook
+            const wb = XLSX.utils.book_new();
+
+            // Create summary data
+            const summaryData = [
+                ['Australian Property CGT Calculation'],
+                [''],
+                ['Property Details'],
+                ['Address', document.getElementById('propertyAddress').value],
+                ['Property Type', document.getElementById('propertyType').value],
+                [''],
+                ['Financial Summary'],
+                ['Purchase Price', document.getElementById('purchasePrice').value],
+                ['Sale Price', document.getElementById('salePrice').value],
+                ['Gross Capital Gain', document.getElementById('grossGain').textContent],
+                ['Taxable Capital Gain', document.getElementById('taxableGain').textContent],
+                ['Estimated Tax Payable', document.getElementById('taxPayable').textContent]
+            ];
+
+            const ws = XLSX.utils.aoa_to_sheet(summaryData);
+            XLSX.utils.book_append_sheet(wb, ws, 'CGT Summary');
+
+            // Generate filename
+            const now = new Date();
+            const filename = `Property_CGT_${now.toISOString().slice(0,10)}.xlsx`;
+
+            // Download
+            XLSX.writeFile(wb, filename);
+        }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set default dates
+            const today = new Date();
+            document.getElementById('saleDate').value = today.toISOString().slice(0,10);
+        });
+    </script>
+</body>
+</html>

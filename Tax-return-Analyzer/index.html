@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Tax Return Analyzer - ACEBIZ</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; }
+        @keyframes spin { from { transform: rotate(0) } to { transform: rotate(360deg) } }
+        @keyframes loading { 0% { width: 20% } 50% { width: 80% } 100% { width: 20% } }
+    </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useCallback, useRef } = React;
+
+// ─── PDF.js text extraction via CDN ─────────────────────────
+const PDFJS_CDN = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+const PDFJS_WORKER = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+let pdfjsLoaded = false;
+function loadPdfJs() {
+  return new Promise((resolve, reject) => {
+    if (pdfjsLoaded && window.pdfjsLib) return resolve(window.pdfjsLib);
+    const s = document.createElement("script");
+    s.src = PDFJS_CDN;
+    s.onload = () => {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+      pdfjsLoaded = true;
+      resolve(window.pdfjsLib);
+    };
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+async function extractTextFromPdf(file) {
+  const lib = await loadPdfJs();
+  const buf = await file.arrayBuffer();
+  const pdf = await lib.getDocument({ data: buf }).promise;
+  let text = "";
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    text += content.items.map((it) => it.str).join(" ") + "\n";
+  }
+  return text;
+}
+
+// ─── Tax Extraction Prompt ──────────────────────────────────
+const TAX_PROMPT = (year) => `IMPORTANT: Return ONLY valid JSON with no additional text, no explanations, no markdown formatting.
+
+Extract the following tax return data for FY ${year} as pure JSON:
+
+{
+  "tax_year": "${year}",
+  "taxpayer_name": "",
+  "summary": {
+    "total_income": 0, "total_deductions": 0, "taxable_income": 0,
+    "tax_withheld": 0, "estimated_amount": 0, "is_payable": true
+  },
+  "income": {
+    "salary": 0, "interest": 0, "dividends": 0, "rental_gross": 0,
+    "rental_net": 0, "capital_gains": 0, "other": 0
+  },
+  "capital_gains_details": {
+    "current_year_capital_gain": 0, "current_year_capital_loss": 0,
+    "net_capital_gain_loss": 0, "capital_losses_carried_forward": 0,
+    "capital_losses_applied": 0, "capital_losses_unapplied": 0,
+    "capital_gains_discount_amount": 0, "capital_gains_taxable": 0
+  },
+  "deductions": {
+    "work_related_car": 0, "work_related_travel": 0, "work_related_clothing": 0,
+    "work_related_self_education": 0, "work_related_other": 0,
+    "interest_deductions": 0, "dividend_deductions": 0, "gifts_donations": 0,
+    "cost_managing_tax_affairs": 0, "total": 0
+  },
+  "rental_properties": [
+    {
+      "address": "Full property address", "ownership_percentage": 100, "gross_rent": 0,
+      "expenses": {
+        "interest_on_loans": 0, "body_corporate_strata_fees": 0, "council_rates": 0,
+        "water_rates": 0, "insurance": 0, "land_tax": 0, "property_agent_fees": 0,
+        "repairs_maintenance": 0, "depreciation_div_40": 0, "depreciation_div_43": 0,
+        "capital_allowances": 0, "other_rental_expenses": 0, "total_expenses": 0
+      },
+      "net_income_loss": 0
+    }
+  ],
+  "all_deductions_list": {
+    "D1": { "description": "Work car expenses", "amount": 0, "line_items": [] },
+    "D2": { "description": "Work travel expenses", "amount": 0, "line_items": [] },
+    "D3": { "description": "Work clothing expenses", "amount": 0, "line_items": [] },
+    "D4": { "description": "Work self-education", "amount": 0, "line_items": [] },
+    "D5": { "description": "Other work deductions", "amount": 0, "line_items": [] },
+    "D6": { "description": "Low value pool deduction", "amount": 0, "line_items": [] },
+    "D7": { "description": "Interest deductions", "amount": 0, "line_items": [] },
+    "D8": { "description": "Dividend deductions", "amount": 0, "line_items": [] },
+    "D9": { "description": "Gifts or donations", "amount": 0, "line_items": [] },
+    "D10": { "description": "Cost of managing tax affairs", "amount": 0, "line_items": [] },
+    "D11": { "description": "Deductible amount of UPP", "amount": 0, "line_items": [] },
+    "D12": { "description": "Personal superannuation", "amount": 0, "line_items": [] },
+    "D13": { "description": "Deduction for project pool", "amount": 0, "line_items": [] },
+    "D14": { "description": "Forestry managed investment", "amount": 0, "line_items": [] },
+    "D15": { "description": "Other deductions", "amount": 0, "line_items": [] }
+  }
+}
+
+CRITICAL EXTRACTION RULES:
+1. Extract EVERY deduction item with its D-code (D1-D15) and exact amount
+2. For rental properties, extract ONLY addresses from the "Rental Properties Schedule"
+3. Extract complete property addresses from rental properties schedule only
+4. Look for "ESTIMATED AMOUNT PAYABLE" or "REFUND" for estimated_amount
+5. Set is_payable to true if payable, false if refund
+6. All amounts should be exact as shown in the return
+7. Return ONLY valid JSON, no other text`;
+
+// ─── AI API call (supports Claude & GPT-4) ──────────────────
+let savedApiKey = "";
+let savedProvider = "claude";
+const APP_PASSWORD = "MyOrg2025!Secure";
+let isAuthenticated = false;
+
+async function callClaude(pdfText, year) {
+  const prompt = `${TAX_PROMPT(year)}\n\nHere is the tax return document text:\n---\n${pdfText}\n---\n\nReturn the extracted data as valid JSON only.`;
+
+  if (savedProvider === "claude") {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": savedApiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true"
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4096,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Claude API error: ${res.status}`);
+    }
+    const data = await res.json();
+    let txt = data.content?.[0]?.text || "";
+    if (txt.includes("```json")) txt = txt.split("```json")[1].split("```")[0];
+    else if (txt.includes("```")) txt = txt.split("```")[1].split("```")[0];
+    return JSON.parse(txt.trim());
+  } else {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${savedApiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4-turbo-preview",
+        max_tokens: 4096,
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `OpenAI API error: ${res.status}`);
+    }
+    const data = await res.json();
+    let txt = data.choices?.[0]?.message?.content || "";
+    if (txt.includes("```json")) txt = txt.split("```json")[1].split("```")[0];
+    else if (txt.includes("```")) txt = txt.split("```")[1].split("```")[0];
+    return JSON.parse(txt.trim());
+  }
+}
+
+// ─── Comparison Logic ───────────────────────────────────────
+function validateRental(d) {
+  if (!d.rental_properties || !Array.isArray(d.rental_properties)) { d.rental_properties = []; return; }
+  d.rental_properties = d.rental_properties.filter((p) => {
+    if (!p.address || /full property address|property address/i.test(p.address) || !p.address.trim()) return false;
+    const g = p.gross_rent || 0, n = p.net_income_loss || 0;
+    const t = p.expenses ? Object.values(p.expenses).reduce((s, v) => s + (v || 0), 0) : 0;
+    return g !== 0 || n !== 0 || t !== 0;
+  });
+}
+
+function normAddr(a) { return a.toLowerCase().replace(/\s+/g, " ").trim(); }
+
+const STRIP_WORDS = ["australia", "aus", "nsw", "vic", "qld", "sa", "wa", "tas", "nt", "act", "new south wales", "victoria", "queensland", "south australia", "western australia", "tasmania", "northern territory", "australian capital territory"];
+function coreAddr(a) {
+  let s = normAddr(a);
+  s = s.replace(/\b\d{4}\b/g, "");
+  for (const w of STRIP_WORDS) s = s.replace(new RegExp("\\b" + w + "\\b", "gi"), "");
+  s = s.replace(/,\s*,/g, ",").replace(/,\s*$/g, "").replace(/^\s*,/g, "").replace(/\s+/g, " ").trim();
+  return s;
+}
+
+function streetPart(a) {
+  const core = coreAddr(a);
+  const first = core.split(",")[0].trim();
+  return first;
+}
+
+function wordSimilarity(a, b) {
+  const wa = new Set(a.split(/[\s,]+/).filter(w => w.length > 1));
+  const wb = new Set(b.split(/[\s,]+/).filter(w => w.length > 1));
+  if (wa.size === 0 || wb.size === 0) return 0;
+  let shared = 0;
+  for (const w of wa) if (wb.has(w)) shared++;
+  return shared / Math.max(wa.size, wb.size);
+}
+
+function findProp(addr, list) {
+  const n = normAddr(addr);
+  let m = list.find((p) => normAddr(p.address) === n);
+  if (m) return m;
+  const ca = coreAddr(addr);
+  m = list.find((p) => coreAddr(p.address) === ca);
+  if (m) return m;
+  const sp = streetPart(addr);
+  if (sp.length > 5) {
+    m = list.find((p) => streetPart(p.address) === sp);
+    if (m) return m;
+  }
+  let bestScore = 0, bestMatch = null;
+  for (const p of list) {
+    const score = wordSimilarity(coreAddr(addr), coreAddr(p.address));
+    if (score > bestScore) { bestScore = score; bestMatch = p; }
+  }
+  if (bestScore >= 0.7) return bestMatch;
+  if (sp.length > 5) {
+    m = list.find((p) => {
+      const osp = streetPart(p.address);
+      return osp.length > 5 && (osp.includes(sp) || sp.includes(osp));
+    });
+    if (m) return m;
+  }
+  return null;
+}
+
+const MATERIALITY = { income: 1000, deduction: 100 };
+
+function compareReturns(curr, prev) {
+  const alerts = [];
+  const taxChange = curr.summary.estimated_amount - prev.summary.estimated_amount;
+  const incomeChange = curr.summary.total_income - prev.summary.total_income;
+  const deductionChange = curr.summary.total_deductions - prev.summary.total_deductions;
+
+  if (!prev.summary.is_payable && !curr.summary.is_payable) {
+    const rc = Math.abs(taxChange);
+    if (rc > 0) alerts.push({ type: taxChange > 0 ? "success" : "warning", message: `Refund ${taxChange > 0 ? "increased" : "decreased"} by $${rc.toLocaleString()} (from $${Math.abs(prev.summary.estimated_amount).toLocaleString()} to $${Math.abs(curr.summary.estimated_amount).toLocaleString()})` });
+  } else if (prev.summary.is_payable !== curr.summary.is_payable) {
+    const good = prev.summary.is_payable && !curr.summary.is_payable;
+    alerts.push({ type: good ? "success" : "critical", message: `Tax position changed from ${prev.summary.is_payable ? "payable" : "refund"} of $${Math.abs(prev.summary.estimated_amount).toLocaleString()} to ${curr.summary.is_payable ? "payable" : "refund"} of $${Math.abs(curr.summary.estimated_amount).toLocaleString()}` });
+  } else if (Math.abs(taxChange) > 100) {
+    alerts.push({ type: Math.abs(taxChange) > 5000 ? "critical" : "warning", message: `Tax ${curr.summary.is_payable ? "payable" : "refund"} ${taxChange > 0 ? "increased" : "decreased"} by $${Math.abs(taxChange).toLocaleString()}` });
+  }
+
+  const salaryChange = (curr.income.salary || 0) - (prev.income.salary || 0);
+  if (Math.abs(salaryChange) >= MATERIALITY.income) {
+    const pct = prev.income.salary ? ((Math.abs(salaryChange) / prev.income.salary) * 100).toFixed(1) : 0;
+    alerts.push({ type: Math.abs(salaryChange) > 10000 ? "warning" : "info", message: `Salary ${salaryChange > 0 ? "increased" : "decreased"} by $${Math.abs(salaryChange).toLocaleString()} (${pct}%)` });
+  }
+
+  const dedBreakdown = [];
+  const dedComp = { present_both: [], missing: [], new_this: [], total_change: deductionChange, detailed_breakdown: dedBreakdown };
+  const pDed = prev.all_deductions_list || {}, cDed = curr.all_deductions_list || {};
+  for (const dc in pDed) {
+    const pa = pDed[dc]?.amount || 0, ca = cDed[dc]?.amount || 0;
+    if (pa > 0 && ca === 0) {
+      dedComp.missing.push({ code: dc, description: pDed[dc].description, previous_amount: pa });
+      alerts.push({ type: "critical", message: `MISSING DEDUCTION: ${pDed[dc].description} ($${pa.toLocaleString()} last year, $0 this year)` });
+    } else if (pa === 0 && ca > 0) {
+      dedComp.new_this.push({ code: dc, description: cDed[dc].description, current_amount: ca });
+      alerts.push({ type: "info", message: `NEW DEDUCTION: ${cDed[dc].description} ($${ca.toLocaleString()})` });
+    } else if (pa > 0 && ca > 0 && Math.abs(ca - pa) >= MATERIALITY.deduction) {
+      dedComp.present_both.push({ code: dc, description: cDed[dc].description, previous: pa, current: ca, change: ca - pa });
+    }
+    if (pa > 0 || ca > 0) {
+      dedBreakdown.push({ code: dc, description: cDed[dc]?.description || pDed[dc]?.description, fy_curr: ca, fy_prev: pa, change: ca - pa, pct: pa > 0 ? ((ca - pa) / pa * 100).toFixed(1) : "N/A" });
+    }
+  }
+
+  const rentalBreakdown = { total_change: (curr.income.rental_net || 0) - (prev.income.rental_net || 0), property_details: [] };
+  const prevProps = prev.rental_properties || [], currProps = curr.rental_properties || [];
+  const expenseKeys = [
+    { key: "interest_on_loans", name: "Interest on Loans", critical: true },
+    { key: "body_corporate_strata_fees", name: "Body Corporate/Strata", critical: true },
+    { key: "council_rates", name: "Council Rates", critical: true },
+    { key: "water_rates", name: "Water Rates", critical: true },
+    { key: "insurance", name: "Insurance", critical: true },
+    { key: "property_agent_fees", name: "Agent Fees", critical: false },
+    { key: "repairs_maintenance", name: "Repairs & Maintenance", critical: false },
+    { key: "land_tax", name: "Land Tax", critical: false },
+    { key: "depreciation_div_40", name: "Depreciation Div-40", critical: false },
+    { key: "depreciation_div_43", name: "Depreciation Div-43", critical: true },
+    { key: "capital_allowances", name: "Capital Allowances", critical: false },
+    { key: "other_rental_expenses", name: "Other Expenses", critical: false },
+  ];
+  for (const pp of prevProps) {
+    const cp = findProp(pp.address, currProps);
+    if (cp) {
+      const allExp = [];
+      for (const e of expenseKeys) {
+        const pe = pp.expenses?.[e.key] || 0, ce = cp.expenses?.[e.key] || 0;
+        allExp.push({ type: e.name, fy_prev: pe, fy_curr: ce, change: ce - pe, status: pe > 0 && ce === 0 ? "missing" : pe === 0 && ce > 0 ? "new" : ce - pe === 0 ? "unchanged" : ce - pe > 0 ? "increased" : "decreased" });
+        if (pe > 0 && ce === 0) alerts.push({ type: e.critical ? "critical" : "warning", message: `Property "${pp.address}": ${e.name} missing (was $${pe.toLocaleString()})` });
+      }
+      rentalBreakdown.property_details.push({ address: pp.address, fy_prev_net: pp.net_income_loss, fy_curr_net: cp.net_income_loss, fy_prev_gross: pp.gross_rent || 0, fy_curr_gross: cp.gross_rent || 0, change: cp.net_income_loss - pp.net_income_loss, status: "continuing", all_expenses: allExp });
+    } else {
+      const tot = pp.expenses ? Object.values(pp.expenses).reduce((s, v) => s + (v || 0), 0) : 0;
+      if (Math.abs(pp.net_income_loss) > 100 || tot > 500) {
+        alerts.push({ type: "warning", message: `Property REMOVED: "${pp.address}"` });
+        rentalBreakdown.property_details.push({ address: pp.address, fy_prev_net: pp.net_income_loss, fy_curr_net: 0, change: -pp.net_income_loss, status: "removed", all_expenses: [] });
+      }
+    }
+  }
+  for (const cp of currProps) {
+    if (!findProp(cp.address, prevProps)) {
+      alerts.push({ type: "info", message: `NEW Property: "${cp.address}"` });
+      const newExp = expenseKeys.filter((e) => (cp.expenses?.[e.key] || 0) > 0).map((e) => ({ type: e.name, fy_prev: 0, fy_curr: cp.expenses[e.key], change: cp.expenses[e.key], status: "new" }));
+      rentalBreakdown.property_details.push({ address: cp.address, fy_prev_net: 0, fy_curr_net: cp.net_income_loss, fy_prev_gross: 0, fy_curr_gross: cp.gross_rent || 0, change: cp.net_income_loss, status: "new", all_expenses: newExp });
+    }
+  }
+
+  const capAnalysis = { fy_prev_cf: 0, fy_curr_ob: 0, discrepancy: 0, active: false };
+  const pc = prev.capital_gains_details || {}, cc = curr.capital_gains_details || {};
+  capAnalysis.fy_prev_cf = pc.capital_losses_unapplied || 0;
+  capAnalysis.fy_curr_ob = cc.capital_losses_carried_forward || 0;
+  capAnalysis.discrepancy = capAnalysis.fy_curr_ob - capAnalysis.fy_prev_cf;
+  capAnalysis.active = (pc.current_year_capital_gain > 0) || (cc.current_year_capital_gain > 0) || capAnalysis.fy_prev_cf > 0;
+  if (capAnalysis.fy_prev_cf > 0 && capAnalysis.discrepancy !== 0) alerts.push({ type: "critical", message: `CAPITAL LOSSES MISMATCH: Prev carried $${capAnalysis.fy_prev_cf.toLocaleString()}, Curr shows $${capAnalysis.fy_curr_ob.toLocaleString()}` });
+
+  if (alerts.length === 0) alerts.push({ type: "success", message: "No significant changes detected" });
+  const order = { critical: 1, warning: 2, info: 3, success: 4 };
+  alerts.sort((a, b) => (order[a.type] || 5) - (order[b.type] || 5));
+
+  const ib = {};
+  for (const k of ["salary", "interest", "dividends", "capital_gains", "other"]) {
+    const p = prev.income[k] || 0, c = curr.income[k] || 0;
+    ib[k] = { fy_prev: p, fy_curr: c, change: c - p, pct: p ? ((c - p) / p * 100).toFixed(1) : "0.0" };
+  }
+  ib.rental = { fy_prev: prev.income.rental_net || 0, fy_curr: curr.income.rental_net || 0, change: (curr.income.rental_net || 0) - (prev.income.rental_net || 0), pct: prev.income.rental_net ? (((curr.income.rental_net || 0) - (prev.income.rental_net || 0)) / prev.income.rental_net * 100).toFixed(1) : "0.0" };
+  ib.total = { fy_prev: prev.summary.total_income, fy_curr: curr.summary.total_income, change: incomeChange, pct: prev.summary.total_income ? (incomeChange / prev.summary.total_income * 100).toFixed(1) : "0.0" };
+
+  return {
+    previous: { year: prev.tax_year, amount: prev.summary.estimated_amount, type: prev.summary.is_payable ? "Payable" : "Refund", totalIncome: prev.summary.total_income, salary: prev.income.salary, rental: prev.income.rental_net, deductions: prev.summary.total_deductions },
+    current: { year: curr.tax_year, amount: curr.summary.estimated_amount, type: curr.summary.is_payable ? "Payable" : "Refund", totalIncome: curr.summary.total_income, salary: curr.income.salary, rental: curr.income.rental_net, deductions: curr.summary.total_deductions },
+    changes: { tax: taxChange, income: incomeChange, salary: salaryChange, rental: (curr.income.rental_net || 0) - (prev.income.rental_net || 0), deductions: deductionChange },
+    deduction_analysis: dedComp,
+    rental_breakdown: rentalBreakdown,
+    income_breakdown: ib,
+    capital_gains: capAnalysis,
+    alerts,
+  };
+}
+
+// ─── Format helpers ─────────────────────────────────────────
+const fmt = (v) => `$${Math.abs(v).toLocaleString()}`;
+const fmtChange = (v) => v > 0 ? `+${fmt(v)}` : v < 0 ? `-${fmt(v)}` : fmt(v);
+const clr = (v, inv) => {
+  if (v === 0) return "#888";
+  if (inv) return v > 0 ? "#dc3545" : "#28a745";
+  return v > 0 ? "#28a745" : "#dc3545";
+};
+
+// ─── Sub-components ─────────────────────────────────────────
+function AlertItem({ alert }) {
+  const icons = { critical: "\u{1F6A8}", warning: "\u26A0\uFE0F", info: "\u2139\uFE0F", success: "\u2705" };
+  const bgs = { critical: "#fde8e8", warning: "#fff3cd", info: "#e8f4fd", success: "#d4edda" };
+  const bords = { critical: "#dc3545", warning: "#ffc107", info: "#0d6efd", success: "#28a745" };
+  return (
+    <div style={{ padding: "10px 14px", marginBottom: 6, borderRadius: 8, background: bgs[alert.type], borderLeft: `4px solid ${bords[alert.type]}`, display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13 }}>
+      <span>{icons[alert.type]}</span>
+      <span>{alert.message}</span>
+    </div>
+  );
+}
+
+function Modal({ title, children, onClose }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={onClose}>
+      <div style={{ background: "#fff", borderRadius: 14, maxWidth: 900, width: "100%", maxHeight: "85vh", overflow: "auto", padding: 28, position: "relative" }} onClick={(e) => e.stopPropagation()}>
+        <button onClick={onClose} style={{ position: "absolute", top: 12, right: 16, border: "none", background: "none", fontSize: 22, cursor: "pointer", color: "#666" }}>{"\u2715"}</button>
+        <h3 style={{ margin: "0 0 16px", fontSize: 18, color: "#1a1a2e" }}>{title}</h3>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function CompTable({ headers, rows }) {
+  return (
+    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+      <thead>
+        <tr style={{ background: "#f0f2f5" }}>
+          {headers.map((h, i) => <th key={i} style={{ padding: "8px 10px", borderBottom: "2px solid #ddd", textAlign: i === 0 ? "left" : "right", fontWeight: 600, color: "#444" }}>{h}</th>)}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r, i) => (
+          <tr key={i} style={{ background: r.bg || (i % 2 === 0 ? "#fff" : "#fafbfc"), fontWeight: r.bold ? 700 : 400 }}>
+            {r.cells.map((c, j) => <td key={j} style={{ padding: "7px 10px", borderBottom: "1px solid #eee", textAlign: j === 0 ? "left" : "right", color: c.color || "#333" }}>{c.text || c}</td>)}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+// ─── Modal Contents ─────────────────────────────────────────
+function IncomeModal({ ib }) {
+  const sources = [
+    { key: "salary", label: "Salary" }, { key: "rental", label: "Rental" },
+    { key: "interest", label: "Interest" }, { key: "dividends", label: "Dividends" },
+    { key: "capital_gains", label: "Capital Gains" }, { key: "other", label: "Other" },
+  ];
+  const rows = sources.filter((s) => ib[s.key] && (ib[s.key].fy_curr || ib[s.key].fy_prev)).map((s) => ({
+    cells: [s.label, fmt(ib[s.key].fy_curr), fmt(ib[s.key].fy_prev), { text: `${fmtChange(ib[s.key].change)} (${ib[s.key].pct}%)`, color: clr(ib[s.key].change) }],
+  }));
+  rows.push({ bold: true, bg: "#e8eaed", cells: ["TOTAL", fmt(ib.total.fy_curr), fmt(ib.total.fy_prev), { text: `${fmtChange(ib.total.change)} (${ib.total.pct}%)`, color: clr(ib.total.change) }] });
+  return <CompTable headers={["Source", "Current Year", "Previous Year", "Change"]} rows={rows} />;
+}
+
+function DeductionModal({ da }) {
+  const rows = da.detailed_breakdown.map((d) => ({
+    bg: d.fy_prev > 0 && d.fy_curr === 0 ? "#fde8e8" : d.fy_prev === 0 && d.fy_curr > 0 ? "#d4edda" : undefined,
+    cells: [{ text: d.code, color: "#302b63" }, d.description, fmt(d.fy_curr), fmt(d.fy_prev), { text: fmtChange(d.change), color: clr(d.change) }],
+  }));
+  rows.push({ bold: true, bg: "#e8eaed", cells: ["", "TOTAL", "", "", { text: fmtChange(da.total_change), color: clr(da.total_change) }] });
+  return (
+    <div>
+      <CompTable headers={["Code", "Description", "Current", "Previous", "Change"]} rows={rows} />
+      {da.missing.length > 0 && (
+        <div style={{ marginTop: 16, padding: 12, background: "#fde8e8", borderRadius: 8, borderLeft: "4px solid #dc3545" }}>
+          <strong style={{ color: "#dc3545" }}>Missing Deductions:</strong>
+          <ul style={{ margin: "6px 0 0", paddingLeft: 20, fontSize: 13 }}>
+            {da.missing.map((m, i) => <li key={i}>{m.description}: {fmt(m.previous_amount)} (previous year)</li>)}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RentalModal({ rb }) {
+  const [expanded, setExpanded] = useState({});
+  return (
+    <div>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <thead>
+          <tr style={{ background: "#f0f2f5" }}>
+            {["Property", "Current Net", "Previous Net", "Change", "Status"].map((h, i) => <th key={i} style={{ padding: "8px 10px", borderBottom: "2px solid #ddd", textAlign: i === 0 ? "left" : "right", fontWeight: 600, color: "#444" }}>{h}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {rb.property_details.map((p, i) => (
+            <React.Fragment key={i}>
+              <tr style={{ background: p.status === "removed" ? "#fde8e8" : p.status === "new" ? "#d4edda" : "#fff", cursor: p.all_expenses?.length ? "pointer" : "default" }} onClick={() => p.all_expenses?.length && setExpanded((x) => ({ ...x, [i]: !x[i] }))}>
+                <td style={{ padding: "8px 10px", borderBottom: "1px solid #eee", color: p.all_expenses?.length ? "#0066cc" : "#333", textDecoration: p.all_expenses?.length ? "underline" : "none" }}>{p.address} {p.all_expenses?.length ? (expanded[i] ? "\u25BC" : "\u25B6") : ""}</td>
+                <td style={{ padding: "8px 10px", borderBottom: "1px solid #eee", textAlign: "right" }}>{fmt(p.fy_curr_net)}</td>
+                <td style={{ padding: "8px 10px", borderBottom: "1px solid #eee", textAlign: "right" }}>{fmt(p.fy_prev_net)}</td>
+                <td style={{ padding: "8px 10px", borderBottom: "1px solid #eee", textAlign: "right", color: clr(p.change) }}>{fmtChange(p.change)}</td>
+                <td style={{ padding: "8px 10px", borderBottom: "1px solid #eee", textAlign: "right", fontWeight: 600, textTransform: "capitalize" }}>{p.status}</td>
+              </tr>
+              {expanded[i] && p.all_expenses?.length > 0 && (
+                <tr key={`exp-${i}`}>
+                  <td colSpan={5} style={{ padding: 0 }}>
+                    <div style={{ background: "#f9f9f9", padding: 14, borderTop: "2px solid #e0e0e0" }}>
+                      <strong style={{ fontSize: 12, color: "#555" }}>Expense Breakdown:</strong>
+                      {p.fy_curr_gross !== undefined && (
+                        <div style={{ display: "flex", gap: 16, margin: "8px 0", fontSize: 12, color: "#555" }}>
+                          <span>Gross Rent (Curr): <strong>{fmt(p.fy_curr_gross)}</strong></span>
+                          <span>Gross Rent (Prev): <strong>{fmt(p.fy_prev_gross || 0)}</strong></span>
+                        </div>
+                      )}
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, marginTop: 6 }}>
+                        <thead><tr style={{ background: "#e8eaed" }}>{["Expense", "Current", "Previous", "Change", "Status"].map((h, j) => <th key={j} style={{ padding: "5px 8px", borderBottom: "1px solid #ddd", textAlign: j === 0 ? "left" : "right", fontSize: 11 }}>{h}</th>)}</tr></thead>
+                        <tbody>
+                          {p.all_expenses.map((e, j) => (
+                            <tr key={j} style={{ background: e.status === "missing" ? "#fde8e8" : e.status === "new" ? "#d4edda" : "#fff" }}>
+                              <td style={{ padding: "4px 8px", borderBottom: "1px solid #eee" }}>{e.type}</td>
+                              <td style={{ padding: "4px 8px", borderBottom: "1px solid #eee", textAlign: "right" }}>{fmt(e.fy_curr)}</td>
+                              <td style={{ padding: "4px 8px", borderBottom: "1px solid #eee", textAlign: "right" }}>{fmt(e.fy_prev)}</td>
+                              <td style={{ padding: "4px 8px", borderBottom: "1px solid #eee", textAlign: "right", color: clr(e.change, true) }}>{fmtChange(e.change)}</td>
+                              <td style={{ padding: "4px 8px", borderBottom: "1px solid #eee", textAlign: "right", textTransform: "capitalize", fontWeight: e.status === "missing" ? 700 : 400, color: e.status === "missing" ? "#dc3545" : "#555" }}>{e.status}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </React.Fragment>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── Main App ───────────────────────────────────────────────
+function LoginScreen({ onLogin }) {
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const handleLogin = () => {
+    if (password === APP_PASSWORD) {
+      isAuthenticated = true;
+      onLogin();
+    } else {
+      setError("Incorrect password. Please try again.");
+    }
+  };
+  return (
+    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+      <div style={{ background: "#fff", borderRadius: 20, maxWidth: 420, width: "100%", padding: "40px 36px", boxShadow: "0 25px 80px rgba(0,0,0,.35)", textAlign: "center" }}>
+        <div style={{ fontSize: 48, marginBottom: 8 }}>{"\uD83D\uDCCA"}</div>
+        <h1 style={{ fontSize: 24, color: "#1a1a2e", margin: "0 0 6px", fontWeight: 700 }}>Tax Return Analyzer</h1>
+        <p style={{ color: "#666", fontSize: 14, margin: "0 0 24px" }}>Enter password to access the application</p>
+        {error && <div style={{ background: "#fde8e8", color: "#dc3545", padding: "10px 14px", borderRadius: 8, marginBottom: 16, fontSize: 13, borderLeft: "4px solid #dc3545" }}>{error}</div>}
+        <div style={{ marginBottom: 16 }}>
+          <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#555", marginBottom: 6, textAlign: "left" }}>Password</label>
+          <input
+            type="password"
+            placeholder="Enter your password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+            style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: "2px solid #e0e0e0", fontSize: 14, outline: "none" }}
+          />
+        </div>
+        <button onClick={handleLogin} style={{ width: "100%", padding: 14, background: "linear-gradient(135deg, #302b63, #24243e)", color: "#fff", border: "none", borderRadius: 10, fontSize: 16, fontWeight: 600, cursor: "pointer" }}>Sign In</button>
+        <div style={{ textAlign: "center", marginTop: 16, fontSize: 11, color: "#aaa" }}>ACEBIZ Tax Return Analyzer v2.1.2</div>
+      </div>
+    </div>
+  );
+}
+
+function TaxAnalyzer() {
+  const [step, setStep] = useState(isAuthenticated ? "upload" : "login");
+  const [progress, setProgress] = useState("");
+  const [error, setError] = useState("");
+  const [results, setResults] = useState(null);
+  const [modal, setModal] = useState(null);
+  const prevRef = useRef(null);
+  const currRef = useRef(null);
+  const [prevName, setPrevName] = useState("");
+  const [currName, setCurrName] = useState("");
+  const [prevYear, setPrevYear] = useState("2024");
+  const [currYear, setCurrYear] = useState("2025");
+  const apiKey = savedApiKey;
+  const provider = savedProvider;
+
+  const analyze = useCallback(async () => {
+    const pf = prevRef.current?.files?.[0];
+    const cf = currRef.current?.files?.[0];
+    if (!pf || !cf) { setError("Please upload both PDF files"); return; }
+    setError("");
+    setStep("analyzing");
+    try {
+      setProgress("Loading PDF parser...");
+      await loadPdfJs();
+      setProgress(`Extracting text from ${pf.name}...`);
+      const prevText = await extractTextFromPdf(pf);
+      setProgress(`Extracting text from ${cf.name}...`);
+      const currText = await extractTextFromPdf(cf);
+      setProgress(`AI analyzing FY ${prevYear} return (this may take 30-60s)...`);
+      const prevData = await callClaude(prevText, prevYear);
+      setProgress(`AI analyzing FY ${currYear} return...`);
+      const currData = await callClaude(currText, currYear);
+      validateRental(prevData);
+      validateRental(currData);
+      setProgress("Comparing returns and generating insights...");
+      const res = compareReturns(currData, prevData);
+      setResults(res);
+      setStep("results");
+    } catch (e) {
+      setError(e.message || "Analysis failed");
+      setStep("upload");
+    }
+  }, [prevYear, currYear]);
+
+  const reset = () => { setStep("upload"); setResults(null); setError(""); setProgress(""); setPrevName(""); setCurrName(""); };
+
+  // ─── LOGIN SCREEN ───────────────────────────────────────
+  if (step === "login") {
+    return <LoginScreen onLogin={() => setStep("upload")} />;
+  }
+
+  // ─── UPLOAD SCREEN ──────────────────────────────────────
+  if (step === "upload") {
+    return (
+      <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+        <div style={{ background: "#fff", borderRadius: 20, maxWidth: 680, width: "100%", padding: "40px 36px", boxShadow: "0 25px 80px rgba(0,0,0,.35)" }}>
+          <div style={{ textAlign: "center", marginBottom: 32 }}>
+            <div style={{ fontSize: 48, marginBottom: 8 }}>{"\uD83D\uDCCA"}</div>
+            <h1 style={{ fontSize: 26, color: "#1a1a2e", margin: "0 0 6px", fontWeight: 700 }}>AI Tax Return Analyzer</h1>
+            <p style={{ color: "#666", fontSize: 14, margin: 0 }}>ACEBIZ — Upload two years of tax returns for detailed comparison</p>
+          </div>
+
+          {error && <div style={{ background: "#fde8e8", color: "#dc3545", padding: "10px 14px", borderRadius: 8, marginBottom: 16, fontSize: 13, borderLeft: "4px solid #dc3545" }}>{error}</div>}
+
+          <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#555", marginBottom: 4 }}>Previous Year</label>
+              <select value={prevYear} onChange={(e) => setPrevYear(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "2px solid #e0e0e0", fontSize: 14 }}>
+                {["2021", "2022", "2023", "2024", "2025"].map((y) => <option key={y} value={y}>FY {y}</option>)}
+              </select>
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#555", marginBottom: 4 }}>Current Year</label>
+              <select value={currYear} onChange={(e) => setCurrYear(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "2px solid #e0e0e0", fontSize: 14 }}>
+                {["2022", "2023", "2024", "2025", "2026"].map((y) => <option key={y} value={y}>FY {y}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {[{ ref: prevRef, label: `Previous Year (FY ${prevYear})`, name: prevName, setName: setPrevName }, { ref: currRef, label: `Current Year (FY ${currYear})`, name: currName, setName: setCurrName }].map((f, i) => (
+            <div key={i} style={{ border: "2px dashed #ccc", borderRadius: 12, padding: 20, textAlign: "center", marginBottom: 14, background: f.name ? "#f0fff4" : "#fafbfc", cursor: "pointer", transition: "all .2s" }} onClick={() => f.ref.current?.click()}>
+              <input ref={f.ref} type="file" accept=".pdf" style={{ display: "none" }} onChange={(e) => f.setName(e.target.files?.[0]?.name || "")} />
+              <div style={{ fontSize: 28, marginBottom: 4 }}>{f.name ? "\u2705" : "\uD83D\uDCC4"}</div>
+              <div style={{ fontWeight: 600, color: "#333", fontSize: 14 }}>{f.label}</div>
+              <div style={{ fontSize: 12, color: f.name ? "#28a745" : "#999", marginTop: 4 }}>{f.name || "Click to upload PDF"}</div>
+            </div>
+          ))}
+
+          <button onClick={analyze} disabled={!prevName || !currName} style={{ width: "100%", padding: 14, background: prevName && currName ? "linear-gradient(135deg, #302b63, #24243e)" : "#ccc", color: "#fff", border: "none", borderRadius: 10, fontSize: 16, fontWeight: 600, cursor: prevName && currName ? "pointer" : "not-allowed", marginTop: 8 }}>
+            {"\uD83D\uDD0D"} Analyze Tax Returns
+          </button>
+
+          <div style={{ textAlign: "center", marginTop: 16, fontSize: 11, color: "#aaa" }}>ACEBIZ Tax Return Analyzer v2.1.2</div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── ANALYZING SCREEN ───────────────────────────────────
+  if (step === "analyzing") {
+    return (
+      <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
+        <div style={{ textAlign: "center", color: "#fff" }}>
+          <div style={{ fontSize: 56, marginBottom: 20, animation: "spin 2s linear infinite" }}>{"\u2699\uFE0F"}</div>
+          <h2 style={{ fontSize: 22, marginBottom: 10 }}>Analyzing Tax Returns</h2>
+          <p style={{ color: "#aaa", fontSize: 14 }}>{progress}</p>
+          <div style={{ width: 200, height: 4, background: "#444", borderRadius: 4, margin: "16px auto", overflow: "hidden" }}>
+            <div style={{ width: "60%", height: "100%", background: "#6c63ff", borderRadius: 4, animation: "loading 1.5s ease-in-out infinite" }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── RESULTS SCREEN ─────────────────────────────────────
+  const r = results;
+  const isGood = (r.current.type === "Refund" && r.previous.type === "Refund" && r.current.amount >= r.previous.amount) || (r.current.type === "Refund" && r.previous.type === "Payable") || (r.current.type === "Payable" && r.previous.type === "Payable" && r.current.amount <= r.previous.amount);
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#f4f5f9", fontFamily: "'Segoe UI', system-ui, sans-serif", padding: "20px 16px" }}>
+      {modal && <Modal title={modal.title} onClose={() => setModal(null)}>{modal.content}</Modal>}
+
+      <div style={{ maxWidth: 920, margin: "0 auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <div>
+            <h1 style={{ fontSize: 22, color: "#1a1a2e", margin: 0 }}>{"\uD83D\uDCCA"} Tax Return Analysis</h1>
+            <p style={{ color: "#888", fontSize: 12, margin: "2px 0 0" }}>FY {r.previous.year} vs FY {r.current.year} — ACEBIZ</p>
+          </div>
+          <button onClick={reset} style={{ padding: "8px 18px", background: "#302b63", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>New Analysis</button>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
+          {[
+            { label: `FY ${r.previous.year}`, value: `${fmt(r.previous.amount)}`, sub: r.previous.type, color: r.previous.type === "Refund" ? "#28a745" : "#dc3545" },
+            { label: `FY ${r.current.year}`, value: `${fmt(r.current.amount)}`, sub: r.current.type, color: r.current.type === "Refund" ? "#28a745" : "#dc3545" },
+            { label: "Change", value: fmtChange(r.changes.tax), sub: isGood ? "Favourable" : "Unfavourable", color: isGood ? "#28a745" : "#dc3545" },
+          ].map((c, i) => (
+            <div key={i} style={{ background: "#fff", borderRadius: 12, padding: "18px 16px", boxShadow: "0 2px 8px rgba(0,0,0,.06)", textAlign: "center" }}>
+              <div style={{ fontSize: 11, color: "#888", fontWeight: 600, textTransform: "uppercase", letterSpacing: .5 }}>{c.label}</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: c.color, margin: "6px 0 2px" }}>{c.value}</div>
+              <div style={{ fontSize: 12, color: c.color, fontWeight: 600 }}>{c.sub}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10, marginBottom: 16 }}>
+          {[
+            { label: "Income", value: r.changes.income, click: () => setModal({ title: "Income Breakdown", content: <IncomeModal ib={r.income_breakdown} /> }) },
+            { label: "Salary", value: r.changes.salary },
+            { label: "Rental", value: r.changes.rental, click: r.rental_breakdown?.property_details?.length ? () => setModal({ title: "Rental Breakdown", content: <RentalModal rb={r.rental_breakdown} /> }) : null },
+            { label: "Deductions", value: r.changes.deductions, inv: true, click: r.deduction_analysis?.detailed_breakdown?.length ? () => setModal({ title: "Deduction Breakdown", content: <DeductionModal da={r.deduction_analysis} /> }) : null },
+          ].map((c, i) => (
+            <div key={i} onClick={c.click} style={{ background: "#fff", borderRadius: 10, padding: "14px 12px", boxShadow: "0 2px 6px rgba(0,0,0,.04)", textAlign: "center", cursor: c.click ? "pointer" : "default", border: c.click ? "1px solid #e0e0e0" : "1px solid transparent", transition: "all .2s" }}>
+              <div style={{ fontSize: 11, color: "#888", fontWeight: 600 }}>{c.label}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: clr(c.value, c.inv), marginTop: 4 }}>{fmtChange(c.value)}</div>
+              {c.click && <div style={{ fontSize: 10, color: "#6c63ff", marginTop: 4 }}>Click for details</div>}
+            </div>
+          ))}
+        </div>
+
+        <div style={{ background: "#fff", borderRadius: 12, padding: 20, marginBottom: 16, boxShadow: "0 2px 8px rgba(0,0,0,.06)" }}>
+          <h3 style={{ fontSize: 15, color: "#1a1a2e", margin: "0 0 12px" }}>{"\uD83D\uDCCB"} Client Summary</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+            <div style={{ padding: 12, background: "#f8f9fa", borderRadius: 8 }}>
+              <div style={{ fontSize: 11, color: "#888", fontWeight: 600 }}>FY {r.previous.year} Outcome</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: r.previous.type === "Refund" ? "#28a745" : "#dc3545", marginTop: 4 }}>{r.previous.type === "Refund" ? "\u2705 Refund" : "\u26A0\uFE0F Payable"} — {fmt(r.previous.amount)}</div>
+            </div>
+            <div style={{ padding: 12, background: "#f8f9fa", borderRadius: 8 }}>
+              <div style={{ fontSize: 11, color: "#888", fontWeight: 600 }}>FY {r.current.year} Outcome</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: r.current.type === "Refund" ? "#28a745" : "#dc3545", marginTop: 4 }}>{r.current.type === "Refund" ? "\u2705 Refund" : "\u26A0\uFE0F Payable"} — {fmt(r.current.amount)}</div>
+            </div>
+          </div>
+          <div style={{ padding: 12, background: isGood ? "#d4edda" : "#fde8e8", borderRadius: 8, fontSize: 13, color: isGood ? "#155724" : "#721c24" }}>
+            <strong>Overall: </strong>
+            {r.current.type === "Refund" && r.previous.type === "Refund" && (r.changes.tax > 0 ? `Refund INCREASED from ${fmt(r.previous.amount)} to ${fmt(r.current.amount)}` : `Refund DECREASED from ${fmt(r.previous.amount)} to ${fmt(r.current.amount)}`)}
+            {r.current.type === "Payable" && r.previous.type === "Payable" && (r.changes.tax < 0 ? `Tax payable DECREASED from ${fmt(r.previous.amount)} to ${fmt(r.current.amount)}` : `Tax payable INCREASED from ${fmt(r.previous.amount)} to ${fmt(r.current.amount)}`)}
+            {r.current.type === "Refund" && r.previous.type === "Payable" && `Moved from Payable (${fmt(r.previous.amount)}) to Refund (${fmt(r.current.amount)})`}
+            {r.current.type === "Payable" && r.previous.type === "Refund" && `Moved from Refund (${fmt(r.previous.amount)}) to Payable (${fmt(r.current.amount)})`}
+          </div>
+        </div>
+
+        <div style={{ background: "#fff", borderRadius: 12, padding: 20, boxShadow: "0 2px 8px rgba(0,0,0,.06)" }}>
+          <h3 style={{ fontSize: 15, color: "#1a1a2e", margin: "0 0 12px" }}>{"\uD83D\uDD0D"} Findings & Alerts ({r.alerts.length})</h3>
+          {r.alerts.map((a, i) => <AlertItem key={i} alert={a} />)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<TaxAnalyzer />);
+</script>
+</body>
+</html>

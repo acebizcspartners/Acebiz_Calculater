@@ -1,0 +1,28 @@
+# User uploaded data
+Uploaded Data/*
+!Uploaded Data/.gitkeep
+
+# Private Projects - Do NOT include in ACEBIZ hub
+N8n/
+Rental Property/
+Resume Analyser/
+SMSF Audit/
+acebiz-website/
+enhanced-resume-workflow.json
+resume-screening-workflow.json
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.bak
+.vercel

@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACEBIZ - Australian Tax Calculators</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 50px;
+        }
+
+        .header h1 {
+            font-size: 48px;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 20px;
+            opacity: 0.95;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 16px;
+            opacity: 0.85;
+        }
+
+        .calculators-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 30px;
+            margin-bottom: 50px;
+        }
+
+        .calculator-card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .calculator-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 50px rgba(0,0,0,0.3);
+        }
+
+        .calculator-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        .calculator-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 12px;
+        }
+
+        .calculator-description {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .calculator-features {
+            list-style: none;
+            margin-bottom: 20px;
+        }
+
+        .calculator-features li {
+            color: #777;
+            font-size: 14px;
+            padding: 5px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .calculator-features li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .calculator-tag {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            margin-top: 10px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            background: #4CAF50;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-left: 10px;
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            padding: 30px 0;
+            opacity: 0.9;
+        }
+
+        .footer a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 36px;
+            }
+
+            .header p {
+                font-size: 18px;
+            }
+
+            .calculators-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🇦🇺 ACEBIZ Tax Calculators</h1>
+            <p>Professional Australian Tax Calculation Tools</p>
+            <p class="subtitle">ATO-Compliant | Accurate | Easy to Use</p>
+        </div>
+
+        <div class="calculators-grid">
+            <!-- Capital Gains Calculator -->
+            <a href="./capital-gains/" class="calculator-card">
+                <div class="calculator-icon">📈</div>
+                <h2 class="calculator-title">
+                    Capital Gains Calculator
+                    <span class="status-badge">Live</span>
+                </h2>
+                <p class="calculator-description">
+                    Calculate CGT on shares, securities, and funds with FIFO/LIFO methods. Includes dividend reinvestment and multi-currency support.
+                </p>
+                <ul class="calculator-features">
+                    <li>FIFO/LIFO calculation methods</li>
+                    <li>50% CGT discount for 12+ months</li>
+                    <li>Multi-currency (AUD/USD)</li>
+                    <li>Excel import/export</li>
+                    <li>Financial year selection</li>
+                </ul>
+                <span class="calculator-tag">Shares & Securities</span>
+            </a>
+
+            <!-- Franking Credit Calculator -->
+            <a href="./franking-credit/" class="calculator-card">
+                <div class="calculator-icon">💰</div>
+                <h2 class="calculator-title">
+                    Franking Credit Calculator
+                    <span class="status-badge">Live</span>
+                </h2>
+                <p class="calculator-description">
+                    Calculate franking credits and grossed-up dividends for Australian tax purposes with forward and reverse calculations.
+                </p>
+                <ul class="calculator-features">
+                    <li>30% and 25% tax rates</li>
+                    <li>Forward & reverse calculations</li>
+                    <li>Franking percentage support</li>
+                    <li>Real-time results</li>
+                    <li>Mobile-friendly interface</li>
+                </ul>
+                <span class="calculator-tag">Dividends & Franking</span>
+            </a>
+
+            <!-- Tax Planning Calculator -->
+            <a href="./tax-planning/" class="calculator-card">
+                <div class="calculator-icon">💼</div>
+                <h2 class="calculator-title">
+                    Tax Planning Calculator
+                    <span class="status-badge">Live</span>
+                </h2>
+                <p class="calculator-description">
+                    Comprehensive multi-entity tax planning tool. Model income distribution across individuals, companies, trusts, and SMSFs with automatic tax calculations and scenario comparison.
+                </p>
+                <ul class="calculator-features">
+                    <li>Multi-entity planning (5 types)</li>
+                    <li>Capital gains & franking credits</li>
+                    <li>Superannuation tracking</li>
+                    <li>Scenario comparison</li>
+                    <li>Professional reporting</li>
+                </ul>
+                <span class="calculator-tag">Tax Planning & Strategy</span>
+            </a>
+
+            <!-- Rental Property Automation -->
+            <a href="https://rental-automation-seven.vercel.app/" class="calculator-card">
+                <div class="calculator-icon">🏠</div>
+                <h2 class="calculator-title">
+                    Rental Property Automation
+                    <span class="status-badge">Live</span>
+                </h2>
+                <p class="calculator-description">
+                    AI-powered tool to generate ITR-format rental property working papers from agent statements and supporting documents. Automatically categorizes income and expenses per ATO requirements.
+                </p>
+                <ul class="calculator-features">
+                    <li>AI-powered document processing</li>
+                    <li>ITR working paper format</li>
+                    <li>18 ATO expense categories</li>
+                    <li>PDF, Excel, CSV support</li>
+                    <li>Auto-extraction & Excel export</li>
+                </ul>
+                <span class="calculator-tag">Property & Tax Automation</span>
+            </a>
+
+            <!-- Tax Return Analyser -->
+            <a href="./Tax-return-Analyzer/" class="calculator-card">
+                <div class="calculator-icon">📊</div>
+                <h2 class="calculator-title">
+                    Tax Return Analyser
+                    <span class="status-badge">Live</span>
+                </h2>
+                <p class="calculator-description">
+                    AI-powered tool to compare tax returns year-over-year. Automatically identifies changes, analyzes deductions, and generates queries for missing information.
+                </p>
+                <ul class="calculator-features">
+                    <li>Year-over-year comparison (FY 2024 vs 2025)</li>
+                    <li>Property-by-property rental analysis</li>
+                    <li>Deduction breakdown & comparison</li>
+                    <li>AI-powered insights using Claude & GPT-4</li>
+                    <li>Export to Word documents</li>
+                </ul>
+                <span class="calculator-tag">Tax Review & Analysis</span>
+            </a>
+        </div>
+
+        <div class="footer">
+            <p>© 2024 ACEBIZ. All rights reserved.</p>
+            <p><a href="https://github.com/andykul43-a11y/ACEBIZ">View on GitHub</a> | Updated: Nov 6, 2024</p>
+        </div>
+    </div>
+</body>
+</html>

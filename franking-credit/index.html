@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Franking Credit Calculator - Australian Tax</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 800px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #5e72e4 0%, #825ee4 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 40px 30px;
+        }
+
+        .tax-rate-selector {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .rate-option {
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .rate-option input[type="radio"] {
+            display: none;
+        }
+
+        .rate-option label {
+            display: block;
+            padding: 15px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .rate-option input[type="radio"]:checked + label {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+            transform: scale(1.05);
+        }
+
+        .input-section {
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-wrapper input {
+            width: 100%;
+            padding: 12px 40px 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .input-wrapper input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .input-wrapper .symbol {
+            position: absolute;
+            right: 15px;
+            color: #999;
+            font-weight: 500;
+        }
+
+        .calculation-type {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .calc-button {
+            flex: 1;
+            padding: 12px;
+            background: #f5f5f5;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .calc-button.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .calculate-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .calculate-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .results {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 30px;
+            display: none;
+        }
+
+        .results.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .result-item:last-child {
+            border-bottom: none;
+        }
+
+        .result-label {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .result-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .result-item.highlight {
+            background: white;
+            margin: -12px;
+            padding: 20px 12px;
+            border-radius: 10px;
+            border: 2px solid #667eea;
+        }
+
+        .result-item.highlight .result-value {
+            color: #667eea;
+        }
+
+        .info-box {
+            background: #e8f4fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 5px;
+        }
+
+        .info-box h3 {
+            color: #1976D2;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .info-box p {
+            color: #555;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .formula {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: #666;
+        }
+
+        @media (max-width: 600px) {
+            .header h1 {
+                font-size: 24px;
+            }
+            
+            .content {
+                padding: 25px 20px;
+            }
+            
+            .calculation-type {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🇦🇺 Franking Credit Calculator</h1>
+            <p>Calculate franking credits and grossed-up dividends for Australian tax purposes</p>
+        </div>
+        
+        <div class="content">
+            <div class="tax-rate-selector">
+                <div class="rate-option">
+                    <input type="radio" id="rate30" name="taxRate" value="30" checked>
+                    <label for="rate30">
+                        <strong>30%</strong><br>
+                        <small>Standard Rate</small>
+                    </label>
+                </div>
+                <div class="rate-option">
+                    <input type="radio" id="rate25" name="taxRate" value="25">
+                    <label for="rate25">
+                        <strong>25%</strong><br>
+                        <small>Base Rate Entity</small>
+                    </label>
+                </div>
+            </div>
+
+            <div class="input-section">
+                <div class="input-group">
+                    <label for="frankingPercentage">Franking Percentage</label>
+                    <div class="input-wrapper">
+                        <input type="number" id="frankingPercentage" placeholder="e.g., 100" min="0" max="100" step="0.01">
+                        <span class="symbol">%</span>
+                    </div>
+                </div>
+
+                <label style="margin-bottom: 10px; display: block; font-weight: 500;">Calculate From:</label>
+                <div class="calculation-type">
+                    <button class="calc-button active" onclick="setCalculationType('dividend')">
+                        Cash Dividend Amount
+                    </button>
+                    <button class="calc-button" onclick="setCalculationType('grossed')">
+                        Grossed-up Amount
+                    </button>
+                </div>
+
+                <div class="input-group">
+                    <label for="amount" id="amountLabel">Cash Dividend Amount</label>
+                    <div class="input-wrapper">
+                        <input type="number" id="amount" placeholder="Enter amount" min="0" step="0.01">
+                        <span class="symbol">$</span>
+                    </div>
+                </div>
+
+                <button class="calculate-btn" onclick="calculate()">Calculate</button>
+            </div>
+
+            <div class="results" id="results">
+                <div class="result-item">
+                    <span class="result-label">Cash Dividend</span>
+                    <span class="result-value" id="cashDividend">$0.00</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Franking Credit</span>
+                    <span class="result-value" id="frankingCredit">$0.00</span>
+                </div>
+                <div class="result-item highlight">
+                    <span class="result-label">Grossed-up Dividend</span>
+                    <span class="result-value" id="grossedUpDividend">$0.00</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Franking Percentage</span>
+                    <span class="result-value" id="resultFrankingPercentage">0%</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Company Tax Rate</span>
+                    <span class="result-value" id="resultTaxRate">30%</span>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <h3>📊 How It Works</h3>
+                <p>This calculator helps you determine franking credits and grossed-up dividends based on the franking percentage. You can calculate either from the cash dividend amount (forward calculation) or from the grossed-up amount (reverse calculation).</p>
+                <div class="formula">
+                    Franking Credit = (Cash Dividend × Tax Rate ÷ (1 - Tax Rate)) × Franking %
+                    <br>
+                    Grossed-up Dividend = Cash Dividend + Franking Credit
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let calculationType = 'dividend';
+
+        function setCalculationType(type) {
+            calculationType = type;
+            
+            // Update button states
+            document.querySelectorAll('.calc-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Update label
+            const label = document.getElementById('amountLabel');
+            const input = document.getElementById('amount');
+            
+            if (type === 'dividend') {
+                label.textContent = 'Cash Dividend Amount';
+                input.placeholder = 'Enter cash dividend amount';
+            } else {
+                label.textContent = 'Grossed-up Dividend Amount';
+                input.placeholder = 'Enter grossed-up amount';
+            }
+        }
+
+        function calculate() {
+            // Get inputs
+            const frankingPercentage = parseFloat(document.getElementById('frankingPercentage').value) || 0;
+            const amount = parseFloat(document.getElementById('amount').value) || 0;
+            const taxRateElement = document.querySelector('input[name="taxRate"]:checked');
+            const taxRate = parseFloat(taxRateElement.value) / 100;
+            
+            if (frankingPercentage < 0 || frankingPercentage > 100) {
+                alert('Franking percentage must be between 0 and 100');
+                return;
+            }
+            
+            if (amount <= 0) {
+                alert('Please enter a valid amount');
+                return;
+            }
+            
+            let cashDividend, frankingCredit, grossedUpDividend;
+            
+            if (calculationType === 'dividend') {
+                // Forward calculation from cash dividend
+                cashDividend = amount;
+                frankingCredit = (cashDividend * taxRate / (1 - taxRate)) * (frankingPercentage / 100);
+                grossedUpDividend = cashDividend + frankingCredit;
+            } else {
+                // Reverse calculation from grossed-up amount
+                grossedUpDividend = amount;
+                // Grossed-up = Cash + Franking Credit
+                // Grossed-up = Cash + (Cash × Tax Rate ÷ (1 - Tax Rate) × Franking %)
+                // Grossed-up = Cash × (1 + (Tax Rate ÷ (1 - Tax Rate) × Franking %))
+                const multiplier = 1 + (taxRate / (1 - taxRate) * (frankingPercentage / 100));
+                cashDividend = grossedUpDividend / multiplier;
+                frankingCredit = grossedUpDividend - cashDividend;
+            }
+            
+            // Display results
+            document.getElementById('cashDividend').textContent = '$' + cashDividend.toFixed(2);
+            document.getElementById('frankingCredit').textContent = '$' + frankingCredit.toFixed(2);
+            document.getElementById('grossedUpDividend').textContent = '$' + grossedUpDividend.toFixed(2);
+            document.getElementById('resultFrankingPercentage').textContent = frankingPercentage.toFixed(2) + '%';
+            document.getElementById('resultTaxRate').textContent = (taxRate * 100).toFixed(0) + '%';
+            
+            // Show results
+            document.getElementById('results').classList.add('show');
+        }
+
+        // Allow Enter key to calculate
+        document.addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                calculate();
+            }
+        });
+    </script>
+</body>
+</html>
