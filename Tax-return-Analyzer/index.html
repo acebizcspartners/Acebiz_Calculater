@@ -53,6 +53,20 @@ async function extractTextFromPdf(file) {
   return text;
 }
 
+async function extractTextFromHtml(file) {
+  const text = await file.text();
+  const div = document.createElement("div");
+  div.innerHTML = text;
+  return div.innerText || div.textContent || "";
+}
+
+async function extractTextFromFile(file) {
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".pdf")) return await extractTextFromPdf(file);
+  if (name.endsWith(".html") || name.endsWith(".htm")) return await extractTextFromHtml(file);
+  return await file.text();
+}
+
 // ─── Tax Extraction Prompt ──────────────────────────────────
 const TAX_PROMPT = (year) => `IMPORTANT: Return ONLY valid JSON with no additional text, no explanations, no markdown formatting.
 
@@ -127,8 +141,19 @@ let savedProvider = "claude";
 const APP_PASSWORD = "MyOrg2025!Secure";
 let isAuthenticated = false;
 
-async function callClaude(pdfText, year) {
-  const prompt = `${TAX_PROMPT(year)}\n\nHere is the tax return document text:\n---\n${pdfText}\n---\n\nReturn the extracted data as valid JSON only.`;
+async function callClaude(pdfText, year, sopContext) {
+  let sopSection = "";
+  if (sopContext) {
+    if (sopContext.prefill) sopSection += `\n\nPREFILL DATA (ATO Prefill Report):\n---\n${sopContext.prefill}\n---`;
+    if (sopContext.questionnaire) sopSection += `\n\nCLIENT QUESTIONNAIRE:\n---\n${sopContext.questionnaire}\n---`;
+    if (sopContext.supporting) sopSection += `\n\nSUPPORTING DOCUMENTS (Receipts/Invoices):\n---\n${sopContext.supporting}\n---`;
+    sopSection += `\n\nIMPORTANT SOP CROSS-CHECK INSTRUCTIONS:
+1. Compare tax return amounts against prefill data - flag any discrepancies
+2. Verify client questionnaire answers match what's claimed in the return
+3. Check supporting documents match claimed deduction amounts
+4. Note any items in prefill/questionnaire NOT reflected in the return`;
+  }
+  const prompt = `${TAX_PROMPT(year)}\n\nHere is the tax return document text:\n---\n${pdfText}\n---${sopSection}\n\nReturn the extracted data as valid JSON only.`;
 
   if (savedProvider === "claude") {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -506,21 +531,144 @@ function RentalModal({ rb }) {
   );
 }
 
+// ─── DOCX Report Generator ──────────────────────────────
+function generateReport(r) {
+  const prev = r._rawPrev, curr = r._rawCurr;
+  const name = curr.taxpayer_name || prev.taxpayer_name || "Client";
+  const today = new Date().toLocaleDateString();
+  const fyPrev = r.previous.year, fyCurr = r.current.year;
+
+  const flagCell = (change, threshold) => {
+    if (Math.abs(change) > (threshold || 500)) return 'CHECK';
+    return '';
+  };
+
+  const expenseKeys = [
+    { key: "interest_on_loans", name: "Interest on Loans" },
+    { key: "body_corporate_strata_fees", name: "Body Corporate" },
+    { key: "council_rates", name: "Council Rates" },
+    { key: "insurance", name: "Insurance" },
+    { key: "water_rates", name: "Water Charges" },
+    { key: "depreciation_div_43", name: "Capital Works (Div 43)" },
+    { key: "depreciation_div_40", name: "Depreciation (Div 40)" },
+    { key: "property_agent_fees", name: "Agent Fees" },
+    { key: "repairs_maintenance", name: "Repairs & Maintenance" },
+    { key: "land_tax", name: "Land Tax" },
+    { key: "capital_allowances", name: "Capital Allowances" },
+    { key: "other_rental_expenses", name: "Sundry Expenses" },
+  ];
+
+  let rentalHtml = "";
+  if (r.rental_breakdown?.property_details?.length) {
+    rentalHtml += `<h2 style="color:#1a1a2e;border-bottom:2px solid #302b63;padding-bottom:6px;">Rental Property Comparison (${r.rental_breakdown.property_details.length} Properties)</h2>`;
+    for (const prop of r.rental_breakdown.property_details) {
+      rentalHtml += `<h3 style="color:#302b63;margin-top:20px;">${prop.address}</h3>`;
+      rentalHtml += `<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:12px;border-color:#ccc;">`;
+      rentalHtml += `<tr style="background:#302b63;color:#fff;"><th align="left">Item</th><th align="right">FY${fyPrev}</th><th align="right">FY${fyCurr}</th><th align="right">Change</th><th>Flag</th></tr>`;
+      rentalHtml += `<tr><td>Gross Rent (Income)</td><td align="right">${fmt(prop.fy_prev_gross||0)}</td><td align="right">${fmt(prop.fy_curr_gross||0)}</td><td align="right">${fmtChange((prop.fy_curr_gross||0)-(prop.fy_prev_gross||0))}</td><td></td></tr>`;
+      if (prop.all_expenses) {
+        for (const e of prop.all_expenses) {
+          const flag = e.status === "missing" ? "MISSING" : (Math.abs(e.change) > 1000 ? "CHECK" : "");
+          const bg = e.status === "missing" ? "#fde8e8" : (flag === "CHECK" ? "#fff3cd" : "#fff");
+          rentalHtml += `<tr style="background:${bg}"><td>${e.type}</td><td align="right">${fmt(e.fy_prev)}</td><td align="right">${fmt(e.fy_curr)}</td><td align="right">${fmtChange(e.change)}</td><td style="color:${flag==='MISSING'?'#dc3545':'#856404'};font-weight:bold">${flag}</td></tr>`;
+        }
+      }
+      const totalPrevExp = prop.all_expenses ? prop.all_expenses.reduce((s,e) => s + e.fy_prev, 0) : 0;
+      const totalCurrExp = prop.all_expenses ? prop.all_expenses.reduce((s,e) => s + e.fy_curr, 0) : 0;
+      rentalHtml += `<tr style="background:#e8eaed;font-weight:bold"><td>Total Expenses</td><td align="right">${fmt(totalPrevExp)}</td><td align="right">${fmt(totalCurrExp)}</td><td align="right">${fmtChange(totalCurrExp-totalPrevExp)}</td><td></td></tr>`;
+      rentalHtml += `<tr style="background:#e8eaed;font-weight:bold"><td>Net Result</td><td align="right">${fmt(prop.fy_prev_net)}</td><td align="right">${fmt(prop.fy_curr_net)}</td><td align="right">${fmtChange(prop.change)}</td><td></td></tr>`;
+      rentalHtml += `</table>`;
+    }
+  }
+
+  const alertIcons = { critical: "\u{1F6A8}", warning: "\u26A0\uFE0F", info: "\u2139\uFE0F", success: "\u2705" };
+  let alertsHtml = `<table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:12px;border-color:#ccc;">`;
+  for (const a of r.alerts) {
+    const bg = a.type === "critical" ? "#fde8e8" : a.type === "warning" ? "#fff3cd" : a.type === "info" ? "#e8f4fd" : "#d4edda";
+    alertsHtml += `<tr style="background:${bg}"><td style="width:30px;text-align:center">${alertIcons[a.type]}</td><td>${a.message}</td></tr>`;
+  }
+  alertsHtml += `</table>`;
+
+  // Income & Deductions summary table
+  const ib = r.income_breakdown;
+  let summaryHtml = `<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:12px;border-color:#ccc;">`;
+  summaryHtml += `<tr style="background:#302b63;color:#fff;"><th align="left"></th><th align="right">FY${fyPrev}</th><th align="right">FY${fyCurr}</th><th align="right">Change</th></tr>`;
+  const summaryRows = [
+    { label: "Salary/Wages", prev: prev.income.salary, curr: curr.income.salary },
+    { label: "Interest Income", prev: prev.income.interest, curr: curr.income.interest },
+    { label: "Dividend Income", prev: prev.income.dividends, curr: curr.income.dividends },
+    { label: "Net Rental Income", prev: prev.income.rental_net, curr: curr.income.rental_net },
+    { label: "Capital Gains", prev: prev.income.capital_gains, curr: curr.income.capital_gains },
+    { label: "Other Income", prev: prev.income.other, curr: curr.income.other },
+  ];
+  for (const sr of summaryRows) {
+    const p = sr.prev || 0, c = sr.curr || 0, ch = c - p;
+    if (p === 0 && c === 0) continue;
+    const flag = Math.abs(ch) > 1000 ? (ch > 0 ? "!!" : "!!") : "";
+    summaryHtml += `<tr><td>${sr.label}</td><td align="right">${fmt(p)}</td><td align="right">${fmt(c)}</td><td align="right">${fmtChange(ch)} ${flag}</td></tr>`;
+  }
+  // Deductions
+  const da = r.deduction_analysis;
+  if (da?.detailed_breakdown) {
+    summaryHtml += `<tr style="background:#f0f2f5;font-weight:bold"><td colspan="4">Deductions</td></tr>`;
+    summaryHtml += `<tr style="font-weight:bold"><td>Total Deductions</td><td align="right">${fmt(r.previous.deductions)}</td><td align="right">${fmt(r.current.deductions)}</td><td align="right">${fmtChange(r.changes.deductions)}</td></tr>`;
+    for (const d of da.detailed_breakdown) {
+      if (d.fy_prev === 0 && d.fy_curr === 0) continue;
+      const flag = d.fy_prev > 0 && d.fy_curr === 0 ? "!!" : "";
+      const bg = d.fy_prev > 0 && d.fy_curr === 0 ? "#fde8e8" : "#fff";
+      summaryHtml += `<tr style="background:${bg}"><td>${d.code} ${d.description}</td><td align="right">${fmt(d.fy_prev)}</td><td align="right">${fmt(d.fy_curr)}</td><td align="right">${fmtChange(d.change)} ${flag}</td></tr>`;
+    }
+  }
+  summaryHtml += `<tr style="background:#e8eaed;font-weight:bold"><td>Tax Withheld</td><td align="right">${fmt(prev.summary.tax_withheld||0)}</td><td align="right">${fmt(curr.summary.tax_withheld||0)}</td><td align="right">${fmtChange((curr.summary.tax_withheld||0)-(prev.summary.tax_withheld||0))}</td></tr>`;
+  summaryHtml += `<tr style="background:#e8eaed;font-weight:bold"><td>Est. Tax ${r.previous.type}</td><td align="right">${fmt(r.previous.amount)}</td><td align="right">${fmt(r.current.amount)}</td><td align="right">${fmtChange(r.changes.tax)}</td></tr>`;
+  summaryHtml += `</table>`;
+
+  const parts = [];
+  parts.push('<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">');
+  parts.push('<head><meta charset="utf-8"><title>Tax Analysis Report</title>');
+  parts.push('<style>');
+  parts.push('body { font-family: Segoe UI, Calibri, Arial, sans-serif; margin: 40px; color: #333; font-size: 13px; }');
+  parts.push('h1 { color: #1a1a2e; font-size: 22px; margin-bottom: 2px; }');
+  parts.push('h2 { color: #1a1a2e; font-size: 16px; margin-top: 28px; }');
+  parts.push('h3 { font-size: 14px; }');
+  parts.push('.subtitle { color: #666; font-size: 13px; margin-bottom: 4px; }');
+  parts.push('.meta { color: #888; font-size: 11px; margin-bottom: 24px; }');
+  parts.push('.footer { margin-top: 40px; padding-top: 12px; border-top: 2px solid #302b63; font-size: 11px; color: #888; }');
+  parts.push('table { margin-bottom: 16px; }');
+  parts.push('td, th { font-size: 12px; }');
+  parts.push('</style></head><body>');
+  parts.push('<h1>TAX RETURN ANALYSIS REPORT</h1>');
+  parts.push('<div class="subtitle"><strong>' + name + '</strong> \u2014 FY' + fyPrev + ' vs FY' + fyCurr + '</div>');
+  parts.push('<div class="meta">Generated: ' + today + ' | ACEBIZ \u2014 C&S Partners Australia Pty Ltd</div>');
+  parts.push('<h2 style="border-bottom:2px solid #302b63;padding-bottom:6px;">Tax Position Summary</h2>');
+  parts.push(summaryHtml);
+  parts.push('<h2 style="border-bottom:2px solid #302b63;padding-bottom:6px;">Critical Findings & SOP Checks</h2>');
+  parts.push(alertsHtml);
+  parts.push(rentalHtml);
+  parts.push('<div class="footer"><strong>ACEBIZ \u2014 C&S Partners Australia Pty Ltd</strong> | Tax Agent No. 24742337<br/>204/11 Solent Circuit, Norwest NSW 2153</div>');
+  parts.push('</body></html>');
+  const html = parts.join("\n");
+
+  const blob = new Blob([html], { type: "application/msword" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${name.replace(/\s+/g, "_")}_Tax_Analysis_FY${fyPrev}_vs_FY${fyCurr}.doc`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 // ─── Main App ───────────────────────────────────────────────
 function LoginScreen({ onLogin }) {
   const [password, setPassword] = useState("");
-  const [apiKeyInput, setApiKeyInput] = useState("");
   const [error, setError] = useState("");
   const handleLogin = () => {
     if (password !== APP_PASSWORD) {
       setError("Incorrect password. Please try again.");
       return;
     }
-    if (!apiKeyInput.trim()) {
-      setError("Please enter your Claude API key.");
-      return;
-    }
-    savedApiKey = apiKeyInput.trim();
     isAuthenticated = true;
     onLogin();
   };
@@ -541,17 +689,6 @@ function LoginScreen({ onLogin }) {
             style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: "2px solid #e0e0e0", fontSize: 14, outline: "none" }}
           />
         </div>
-        <div style={{ marginBottom: 16 }}>
-          <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: "#555", marginBottom: 6, textAlign: "left" }}>Claude API Key</label>
-          <input
-            type="password"
-            placeholder="sk-ant-api03-..."
-            value={apiKeyInput}
-            onChange={(e) => setApiKeyInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-            style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: "2px solid #e0e0e0", fontSize: 14, outline: "none" }}
-          />
-        </div>
         <button onClick={handleLogin} style={{ width: "100%", padding: 14, background: "linear-gradient(135deg, #302b63, #24243e)", color: "#fff", border: "none", borderRadius: 10, fontSize: 16, fontWeight: 600, cursor: "pointer" }}>Sign In</button>
         <div style={{ textAlign: "center", marginTop: 16, fontSize: 11, color: "#aaa" }}>ACEBIZ Tax Return Analyzer v2.1.2</div>
       </div>
@@ -567,8 +704,14 @@ function TaxAnalyzer() {
   const [modal, setModal] = useState(null);
   const prevRef = useRef(null);
   const currRef = useRef(null);
+  const prefillRef = useRef(null);
+  const questionnaireRef = useRef(null);
+  const supportingRef = useRef(null);
   const [prevName, setPrevName] = useState("");
   const [currName, setCurrName] = useState("");
+  const [prefillName, setPrefillName] = useState("");
+  const [questionnaireName, setQuestionnaireName] = useState("");
+  const [supportingNames, setSupportingNames] = useState([]);
   const [prevYear, setPrevYear] = useState("2024");
   const [currYear, setCurrYear] = useState("2025");
   const apiKey = savedApiKey;
@@ -583,18 +726,50 @@ function TaxAnalyzer() {
     try {
       setProgress("Loading PDF parser...");
       await loadPdfJs();
+
+      // Extract optional SOP files
+      const sopContext = {};
+      const prefillFile = prefillRef.current?.files?.[0];
+      const questionnaireFile = questionnaireRef.current?.files?.[0];
+      const supportingFiles = supportingRef.current?.files;
+
+      if (prefillFile) {
+        setProgress(`Extracting prefill data from ${prefillFile.name}...`);
+        sopContext.prefill = await extractTextFromFile(prefillFile);
+      }
+      if (questionnaireFile) {
+        setProgress(`Extracting questionnaire from ${questionnaireFile.name}...`);
+        sopContext.questionnaire = await extractTextFromFile(questionnaireFile);
+      }
+      if (supportingFiles && supportingFiles.length > 0) {
+        setProgress(`Extracting ${supportingFiles.length} supporting document(s)...`);
+        let allSupporting = "";
+        for (let i = 0; i < supportingFiles.length; i++) {
+          const sf = supportingFiles[i];
+          if (sf.name.toLowerCase().endsWith(".pdf")) {
+            allSupporting += `\n[${sf.name}]:\n${await extractTextFromPdf(sf)}\n`;
+          } else {
+            allSupporting += `\n[${sf.name}]: (image file - cannot extract text)\n`;
+          }
+        }
+        sopContext.supporting = allSupporting;
+      }
+      const hasSop = Object.keys(sopContext).length > 0 ? sopContext : null;
+
       setProgress(`Extracting text from ${pf.name}...`);
       const prevText = await extractTextFromPdf(pf);
       setProgress(`Extracting text from ${cf.name}...`);
       const currText = await extractTextFromPdf(cf);
       setProgress(`AI analyzing FY ${prevYear} return (this may take 30-60s)...`);
-      const prevData = await callClaude(prevText, prevYear);
+      const prevData = await callClaude(prevText, prevYear, hasSop);
       setProgress(`AI analyzing FY ${currYear} return...`);
-      const currData = await callClaude(currText, currYear);
+      const currData = await callClaude(currText, currYear, hasSop);
       validateRental(prevData);
       validateRental(currData);
       setProgress("Comparing returns and generating insights...");
       const res = compareReturns(currData, prevData);
+      res._rawPrev = prevData;
+      res._rawCurr = currData;
       setResults(res);
       setStep("results");
     } catch (e) {
@@ -603,7 +778,7 @@ function TaxAnalyzer() {
     }
   }, [prevYear, currYear]);
 
-  const reset = () => { setStep("upload"); setResults(null); setError(""); setProgress(""); setPrevName(""); setCurrName(""); };
+  const reset = () => { setStep("upload"); setResults(null); setError(""); setProgress(""); setPrevName(""); setCurrName(""); setPrefillName(""); setQuestionnaireName(""); setSupportingNames([]); };
 
   // ─── LOGIN SCREEN ───────────────────────────────────────
   if (step === "login") {
@@ -615,43 +790,76 @@ function TaxAnalyzer() {
     return (
       <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
         <div style={{ background: "#fff", borderRadius: 20, maxWidth: 680, width: "100%", padding: "40px 36px", boxShadow: "0 25px 80px rgba(0,0,0,.35)" }}>
-          <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{ textAlign: "center", marginBottom: 28 }}>
             <div style={{ fontSize: 48, marginBottom: 8 }}>{"\uD83D\uDCCA"}</div>
-            <h1 style={{ fontSize: 26, color: "#1a1a2e", margin: "0 0 6px", fontWeight: 700 }}>AI Tax Return Analyzer</h1>
-            <p style={{ color: "#666", fontSize: 14, margin: 0 }}>ACEBIZ — Upload two years of tax returns for detailed comparison</p>
+            <h1 style={{ fontSize: 26, color: "#1a1a2e", margin: "0 0 6px", fontWeight: 700 }}>Tax Return Analyzer</h1>
+            <p style={{ color: "#888", fontSize: 13, margin: 0 }}>ACEBIZ {"\u2022"} Instant {"\u2022"} AI Powered {"\u2022"} SOP Cross-Check</p>
           </div>
 
           {error && <div style={{ background: "#fde8e8", color: "#dc3545", padding: "10px 14px", borderRadius: 8, marginBottom: 16, fontSize: 13, borderLeft: "4px solid #dc3545" }}>{error}</div>}
 
+          {/* Year Selectors */}
           <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
             <div style={{ flex: 1 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#555", marginBottom: 4 }}>Previous Year</label>
-              <select value={prevYear} onChange={(e) => setPrevYear(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "2px solid #e0e0e0", fontSize: 14 }}>
-                {["2021", "2022", "2023", "2024", "2025"].map((y) => <option key={y} value={y}>FY {y}</option>)}
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#555", marginBottom: 4 }}>Previous</label>
+              <select value={prevYear} onChange={(e) => setPrevYear(e.target.value)} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "2px solid #e0e0e0", fontSize: 14, background: "#fff" }}>
+                {["2021", "2022", "2023", "2024", "2025"].map((y) => <option key={y} value={y}>{y}</option>)}
               </select>
             </div>
             <div style={{ flex: 1 }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#555", marginBottom: 4 }}>Current Year</label>
-              <select value={currYear} onChange={(e) => setCurrYear(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "2px solid #e0e0e0", fontSize: 14 }}>
-                {["2022", "2023", "2024", "2025", "2026"].map((y) => <option key={y} value={y}>FY {y}</option>)}
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#555", marginBottom: 4 }}>Current</label>
+              <select value={currYear} onChange={(e) => setCurrYear(e.target.value)} style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "2px solid #e0e0e0", fontSize: 14, background: "#fff" }}>
+                {["2022", "2023", "2024", "2025", "2026"].map((y) => <option key={y} value={y}>{y}</option>)}
               </select>
             </div>
           </div>
 
-          {[{ ref: prevRef, label: `Previous Year (FY ${prevYear})`, name: prevName, setName: setPrevName }, { ref: currRef, label: `Current Year (FY ${currYear})`, name: currName, setName: setCurrName }].map((f, i) => (
-            <div key={i} style={{ border: "2px dashed #ccc", borderRadius: 12, padding: 20, textAlign: "center", marginBottom: 14, background: f.name ? "#f0fff4" : "#fafbfc", cursor: "pointer", transition: "all .2s" }} onClick={() => f.ref.current?.click()}>
-              <input ref={f.ref} type="file" accept=".pdf" style={{ display: "none" }} onChange={(e) => f.setName(e.target.files?.[0]?.name || "")} />
-              <div style={{ fontSize: 28, marginBottom: 4 }}>{f.name ? "\u2705" : "\uD83D\uDCC4"}</div>
-              <div style={{ fontWeight: 600, color: "#333", fontSize: 14 }}>{f.label}</div>
-              <div style={{ fontSize: 12, color: f.name ? "#28a745" : "#999", marginTop: 4 }}>{f.name || "Click to upload PDF"}</div>
-            </div>
-          ))}
+          {/* Required Tax Return Uploads */}
+          <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
+            {[{ ref: prevRef, label: `FY ${prevYear} Return`, name: prevName, setName: setPrevName }, { ref: currRef, label: `FY ${currYear} Return`, name: currName, setName: setCurrName }].map((f, i) => (
+              <div key={i} style={{ flex: 1, border: "2px dashed #dc3545", borderRadius: 12, padding: "18px 12px", textAlign: "center", background: f.name ? "#f0fff4" : "#fff5f5", cursor: "pointer", transition: "all .2s" }} onClick={() => f.ref.current?.click()}>
+                <input ref={f.ref} type="file" accept=".pdf" style={{ display: "none" }} onChange={(e) => f.setName(e.target.files?.[0]?.name || "")} />
+                <div style={{ fontSize: 24, marginBottom: 4, color: f.name ? "#28a745" : "#dc3545" }}>{f.name ? "\u2705" : "\uD83D\uDCC4"}</div>
+                <div style={{ fontWeight: 600, color: "#333", fontSize: 13 }}>{f.label}</div>
+                <div style={{ fontSize: 11, color: f.name ? "#28a745" : "#dc3545", marginTop: 4, fontWeight: 600 }}>{f.name || "Required"}</div>
+              </div>
+            ))}
+          </div>
 
-          <button onClick={analyze} disabled={!prevName || !currName} style={{ width: "100%", padding: 14, background: prevName && currName ? "linear-gradient(135deg, #302b63, #24243e)" : "#ccc", color: "#fff", border: "none", borderRadius: 10, fontSize: 16, fontWeight: 600, cursor: prevName && currName ? "pointer" : "not-allowed", marginTop: 8 }}>
-            {"\uD83D\uDD0D"} Analyze Tax Returns
+          {/* Optional SOP Cross-Check */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#888", textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>OPTIONAL — SOP CROSS-CHECK</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              {/* Prefill Data */}
+              <div style={{ flex: 1, border: "2px dashed #ccc", borderRadius: 12, padding: "14px 10px", textAlign: "center", background: prefillName ? "#f0fff4" : "#fafbfc", cursor: "pointer", transition: "all .2s" }} onClick={() => prefillRef.current?.click()}>
+                <input ref={prefillRef} type="file" accept=".pdf,.html,.htm" style={{ display: "none" }} onChange={(e) => setPrefillName(e.target.files?.[0]?.name || "")} />
+                <div style={{ fontSize: 22, marginBottom: 4, color: prefillName ? "#28a745" : "#666" }}>{prefillName ? "\u2705" : "\uD83C\uDFDB\uFE0F"}</div>
+                <div style={{ fontWeight: 600, color: "#333", fontSize: 12 }}>Prefill Data</div>
+                <div style={{ fontSize: 10, color: prefillName ? "#28a745" : "#999", marginTop: 2 }}>{prefillName || "PDF or HTML"}</div>
+              </div>
+              {/* Questionnaire */}
+              <div style={{ flex: 1, border: "2px dashed #ccc", borderRadius: 12, padding: "14px 10px", textAlign: "center", background: questionnaireName ? "#f0fff4" : "#fafbfc", cursor: "pointer", transition: "all .2s" }} onClick={() => questionnaireRef.current?.click()}>
+                <input ref={questionnaireRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={(e) => setQuestionnaireName(e.target.files?.[0]?.name || "")} />
+                <div style={{ fontSize: 22, marginBottom: 4, color: questionnaireName ? "#28a745" : "#666" }}>{questionnaireName ? "\u2705" : "\uD83D\uDCCB"}</div>
+                <div style={{ fontWeight: 600, color: "#333", fontSize: 12 }}>Questionnaire</div>
+                <div style={{ fontSize: 10, color: questionnaireName ? "#28a745" : "#999", marginTop: 2 }}>{questionnaireName || "Client info PDF"}</div>
+              </div>
+              {/* Supporting Docs */}
+              <div style={{ flex: 1, border: "2px dashed #ccc", borderRadius: 12, padding: "14px 10px", textAlign: "center", background: supportingNames.length ? "#f0fff4" : "#fafbfc", cursor: "pointer", transition: "all .2s" }} onClick={() => supportingRef.current?.click()}>
+                <input ref={supportingRef} type="file" accept=".pdf,.jpg,.jpeg,.png" multiple style={{ display: "none" }} onChange={(e) => setSupportingNames(Array.from(e.target.files || []).map(f => f.name))} />
+                <div style={{ fontSize: 22, marginBottom: 4, color: supportingNames.length ? "#28a745" : "#666" }}>{supportingNames.length ? "\u2705" : "\uD83D\uDCC2"}</div>
+                <div style={{ fontWeight: 600, color: "#333", fontSize: 12 }}>Supporting Docs</div>
+                <div style={{ fontSize: 10, color: supportingNames.length ? "#28a745" : "#999", marginTop: 2 }}>{supportingNames.length ? `${supportingNames.length} file(s)` : "Receipts, Invoices (multi)"}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Analyze Button */}
+          <button onClick={analyze} disabled={!prevName || !currName} style={{ width: "100%", padding: 14, background: prevName && currName ? "linear-gradient(135deg, #302b63, #24243e)" : "#ccc", color: "#fff", border: "none", borderRadius: 10, fontSize: 16, fontWeight: 600, cursor: prevName && currName ? "pointer" : "not-allowed" }}>
+            {"\u26A1"} Analyze Instantly
           </button>
 
-          <div style={{ textAlign: "center", marginTop: 16, fontSize: 11, color: "#aaa" }}>ACEBIZ Tax Return Analyzer v2.1.2</div>
+          <div style={{ textAlign: "center", marginTop: 14, fontSize: 11, color: "#aaa" }}>PDF.js text extraction + Claude AI analysis. Results in seconds.</div>
         </div>
       </div>
     );
@@ -687,7 +895,10 @@ function TaxAnalyzer() {
             <h1 style={{ fontSize: 22, color: "#1a1a2e", margin: 0 }}>{"\uD83D\uDCCA"} Tax Return Analysis</h1>
             <p style={{ color: "#888", fontSize: 12, margin: "2px 0 0" }}>FY {r.previous.year} vs FY {r.current.year} — ACEBIZ</p>
           </div>
-          <button onClick={reset} style={{ padding: "8px 18px", background: "#302b63", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>New Analysis</button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => generateReport(r)} style={{ padding: "8px 18px", background: "#28a745", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer", fontWeight: 600 }}>{"\uD83D\uDCC4"} Download Report</button>
+            <button onClick={reset} style={{ padding: "8px 18px", background: "#302b63", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>New Analysis</button>
+          </div>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>

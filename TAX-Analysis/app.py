@@ -6,10 +6,13 @@ from docx import Document
 from docx.shared import Inches, Pt, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 
-API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+API_KEY = os.environ.get("CLAUDE_API_KEY", "")
 APP_PASSWORD = os.environ.get("APP_PASSWORD", "MyOrg2025!Secure")
 client = Anthropic(api_key=API_KEY)
 
@@ -582,59 +585,67 @@ def login():
 
 @app.route("/analyze", methods=["POST"])
 def analyze():
-    prev_file = request.files.get("prevFile")
-    curr_file = request.files.get("currFile")
-    prev_year = request.form.get("prevYear", "2024")
-    curr_year = request.form.get("currYear", "2025")
+    try:
+        prev_file = request.files.get("prevFile")
+        curr_file = request.files.get("currFile")
+        prev_year = request.form.get("prevYear", "2024")
+        curr_year = request.form.get("currYear", "2025")
 
-    if not prev_file or not curr_file:
-        return jsonify({"error": "Both tax return PDFs are required"}), 400
+        if not prev_file or not curr_file:
+            return jsonify({"error": "Both tax return PDFs are required"}), 400
 
-    sop_context = {}
-    prefill = request.files.get("prefillFile")
-    quest = request.files.get("questFile")
-    supp_files = request.files.getlist("suppFile")
+        if not API_KEY:
+            return jsonify({"error": "ANTHROPIC_API_KEY environment variable is not set"}), 500
 
-    prev_text = extract_pdf_text(prev_file)
-    curr_text = extract_pdf_text(curr_file)
+        sop_context = {}
+        prefill = request.files.get("prefillFile")
+        quest = request.files.get("questFile")
+        supp_files = request.files.getlist("suppFile")
 
-    if prefill:
-        sop_context["prefill"] = extract_file_text(prefill)
-    if quest:
-        sop_context["questionnaire"] = extract_file_text(quest)
-    if supp_files and supp_files[0].filename:
-        supp_text = ""
-        for sf in supp_files:
-            if sf.filename.lower().endswith(".pdf"):
-                supp_text += f"\n[{sf.filename}]:\n{extract_pdf_text(sf)}\n"
-            else:
-                supp_text += f"\n[{sf.filename}]: (image file)\n"
-        sop_context["supporting"] = supp_text
+        prev_text = extract_pdf_text(prev_file)
+        curr_text = extract_pdf_text(curr_file)
 
-    sop = sop_context if sop_context else None
+        if prefill:
+            sop_context["prefill"] = extract_file_text(prefill)
+        if quest:
+            sop_context["questionnaire"] = extract_file_text(quest)
+        if supp_files and supp_files[0].filename:
+            supp_text = ""
+            for sf in supp_files:
+                if sf.filename.lower().endswith(".pdf"):
+                    supp_text += f"\n[{sf.filename}]:\n{extract_pdf_text(sf)}\n"
+                else:
+                    supp_text += f"\n[{sf.filename}]: (image file)\n"
+            sop_context["supporting"] = supp_text
 
-    prev_data = call_claude(prev_text, prev_year, sop)
-    curr_data = call_claude(curr_text, curr_year, sop)
-    validate_rental(prev_data)
-    validate_rental(curr_data)
+        sop = sop_context if sop_context else None
 
-    result = compare_returns(curr_data, prev_data)
-    # Return everything including raw data (needed for report generation)
-    return jsonify(result)
+        prev_data = call_claude(prev_text, prev_year, sop)
+        curr_data = call_claude(curr_text, curr_year, sop)
+        validate_rental(prev_data)
+        validate_rental(curr_data)
+
+        result = compare_returns(curr_data, prev_data)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/download-report", methods=["POST"])
 def download_report():
-    result = request.get_json()
-    if not result or "_rawPrev" not in result:
-        return "No analysis data provided", 400
-    doc = generate_docx(result)
-    buf = io.BytesIO()
-    doc.save(buf)
-    buf.seek(0)
-    name = result["_rawCurr"].get("taxpayer_name") or result["_rawPrev"].get("taxpayer_name") or "Client"
-    fname = f"{name.replace(' ', '_')}_Tax_Analysis_FY{result['previous']['year']}_vs_FY{result['current']['year']}.docx"
-    return send_file(buf, as_attachment=True, download_name=fname,
-                     mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+    try:
+        result = request.get_json()
+        if not result or "_rawPrev" not in result:
+            return jsonify({"error": "No analysis data provided"}), 400
+        doc = generate_docx(result)
+        buf = io.BytesIO()
+        doc.save(buf)
+        buf.seek(0)
+        name = result["_rawCurr"].get("taxpayer_name") or result["_rawPrev"].get("taxpayer_name") or "Client"
+        fname = f"{name.replace(' ', '_')}_Tax_Analysis_FY{result['previous']['year']}_vs_FY{result['current']['year']}.docx"
+        return send_file(buf, as_attachment=True, download_name=fname,
+                         mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
