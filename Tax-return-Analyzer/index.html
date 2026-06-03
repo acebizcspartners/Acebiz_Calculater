@@ -135,11 +135,14 @@ CRITICAL EXTRACTION RULES:
 6. All amounts should be exact as shown in the return
 7. Return ONLY valid JSON, no other text`;
 
-// ─── AI API call (supports Claude & GPT-4) ──────────────────
-let savedApiKey = "";
-let savedProvider = "claude";
-const APP_PASSWORD = "MyOrg2025!Secure";
+// ─── AI API call via secure backend proxy (/api/claude) ─────
+// API key is held server-side in ANTHROPIC_API_KEY env var on Vercel.
+// The browser only sends the app password (verified server-side).
 let isAuthenticated = false;
+
+function getAuthPassword() {
+  try { return sessionStorage.getItem("acebiz_auth") || ""; } catch (e) { return ""; }
+}
 
 async function callClaude(pdfText, year, sopContext) {
   let sopSection = "";
@@ -155,53 +158,31 @@ async function callClaude(pdfText, year, sopContext) {
   }
   const prompt = `${TAX_PROMPT(year)}\n\nHere is the tax return document text:\n---\n${pdfText}\n---${sopSection}\n\nReturn the extracted data as valid JSON only.`;
 
-  if (savedProvider === "claude") {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": savedApiKey,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true"
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 4096,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `Claude API error: ${res.status}`);
+  const res = await fetch("/api/claude", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-app-password": getAuthPassword(),
+    },
+    body: JSON.stringify({
+      model: "claude-opus-4-7",
+      max_tokens: 4096,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    if (res.status === 401) {
+      try { sessionStorage.removeItem("acebiz_auth"); } catch (e) {}
+      throw new Error("Session expired. Please refresh and log in again.");
     }
-    const data = await res.json();
-    let txt = data.content?.[0]?.text || "";
-    if (txt.includes("```json")) txt = txt.split("```json")[1].split("```")[0];
-    else if (txt.includes("```")) txt = txt.split("```")[1].split("```")[0];
-    return JSON.parse(txt.trim());
-  } else {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${savedApiKey}`
-      },
-      body: JSON.stringify({
-        model: "gpt-4-turbo-preview",
-        max_tokens: 4096,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `OpenAI API error: ${res.status}`);
-    }
-    const data = await res.json();
-    let txt = data.choices?.[0]?.message?.content || "";
-    if (txt.includes("```json")) txt = txt.split("```json")[1].split("```")[0];
-    else if (txt.includes("```")) txt = txt.split("```")[1].split("```")[0];
-    return JSON.parse(txt.trim());
+    throw new Error(err.error?.message || `Claude API error: ${res.status}`);
   }
+  const data = await res.json();
+  let txt = data.content?.[0]?.text || "";
+  if (txt.includes("```json")) txt = txt.split("```json")[1].split("```")[0];
+  else if (txt.includes("```")) txt = txt.split("```")[1].split("```")[0];
+  return JSON.parse(txt.trim());
 }
 
 // ─── Comparison Logic ───────────────────────────────────────
@@ -387,8 +368,8 @@ function compareReturns(curr, prev) {
 }
 
 // ─── Format helpers ─────────────────────────────────────────
-const fmt = (v) => `$${Math.abs(v).toLocaleString()}`;
-const fmtChange = (v) => v > 0 ? `+${fmt(v)}` : v < 0 ? `-${fmt(v)}` : fmt(v);
+const fmt = (v) => v < 0 ? `-$${Math.abs(v).toLocaleString()}` : `$${v.toLocaleString()}`;
+const fmtChange = (v) => v > 0 ? `+$${v.toLocaleString()}` : v < 0 ? `-$${Math.abs(v).toLocaleString()}` : `$0`;
 const clr = (v, inv) => {
   if (v === 0) return "#888";
   if (inv) return v > 0 ? "#dc3545" : "#28a745";
@@ -664,13 +645,29 @@ function generateReport(r) {
 function LoginScreen({ onLogin }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const handleLogin = () => {
-    if (password !== APP_PASSWORD) {
-      setError("Incorrect password. Please try again.");
-      return;
+  const [busy, setBusy] = useState(false);
+  const handleLogin = async () => {
+    if (!password) { setError("Please enter password"); return; }
+    setBusy(true); setError("");
+    try {
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setError(err.error?.message || "Incorrect password. Please try again.");
+        return;
+      }
+      try { sessionStorage.setItem("acebiz_auth", password); } catch (e) {}
+      isAuthenticated = true;
+      onLogin();
+    } catch (e) {
+      setError("Login failed: " + (e.message || "network error"));
+    } finally {
+      setBusy(false);
     }
-    isAuthenticated = true;
-    onLogin();
   };
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
@@ -686,10 +683,12 @@ function LoginScreen({ onLogin }) {
             placeholder="Enter your password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && !busy) handleLogin(); }}
+            disabled={busy}
             style={{ width: "100%", padding: "12px 14px", borderRadius: 10, border: "2px solid #e0e0e0", fontSize: 14, outline: "none" }}
           />
         </div>
-        <button onClick={handleLogin} style={{ width: "100%", padding: 14, background: "linear-gradient(135deg, #302b63, #24243e)", color: "#fff", border: "none", borderRadius: 10, fontSize: 16, fontWeight: 600, cursor: "pointer" }}>Sign In</button>
+        <button onClick={handleLogin} disabled={busy} style={{ width: "100%", padding: 14, background: busy ? "#888" : "linear-gradient(135deg, #302b63, #24243e)", color: "#fff", border: "none", borderRadius: 10, fontSize: 16, fontWeight: 600, cursor: busy ? "not-allowed" : "pointer" }}>{busy ? "Signing in..." : "Sign In"}</button>
         <div style={{ textAlign: "center", marginTop: 16, fontSize: 11, color: "#aaa" }}>ACEBIZ Tax Return Analyzer v2.1.2</div>
       </div>
     </div>
@@ -697,6 +696,8 @@ function LoginScreen({ onLogin }) {
 }
 
 function TaxAnalyzer() {
+  // Restore session: if user already authenticated this browser session, skip login.
+  if (!isAuthenticated && getAuthPassword()) isAuthenticated = true;
   const [step, setStep] = useState(isAuthenticated ? "upload" : "login");
   const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
@@ -714,8 +715,6 @@ function TaxAnalyzer() {
   const [supportingNames, setSupportingNames] = useState([]);
   const [prevYear, setPrevYear] = useState("2024");
   const [currYear, setCurrYear] = useState("2025");
-  const apiKey = savedApiKey;
-  const provider = savedProvider;
 
   const analyze = useCallback(async () => {
     const pf = prevRef.current?.files?.[0];

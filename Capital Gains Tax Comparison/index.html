@@ -1,0 +1,260 @@
+<!-- ============================================================
+     Acebiz CGT Comparison Tool — Indexation vs 50% Discount
+     Standalone HTML/CSS/JS. Drop into index.html or paste the
+     #acebiz-cgt-tool block + script into an existing page.
+     Chart.js loaded from cdnjs.
+     ============================================================ -->
+<div id="acebiz-cgt-tool"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  /* ---- Acebiz brand tokens ---- */
+  #acebiz-cgt-tool {
+    --navy:#153A7C; --navy-dark:#0E1B3A; --navy-mid:#2C3E73;
+    --teal:#14A9B9; --teal-dark:#0E7F8B; --teal-pale:#D6F1F4;
+    --dark:#1F2933; --body:#4B5563; --grey:#E5E7EB; --off:#F8FAFC; --alert:#C0392B;
+    font-family:'IBM Plex Sans','Helvetica Neue',Helvetica,Arial,sans-serif;
+    background:var(--off); color:var(--dark); line-height:1.5;
+  }
+  #acebiz-cgt-tool *,#acebiz-cgt-tool *::before,#acebiz-cgt-tool *::after{box-sizing:border-box;}
+
+  .acz-accent{height:4px;background:var(--teal);}
+  .acz-header{background:linear-gradient(135deg,var(--navy-dark),var(--navy-mid));padding:28px 28px 32px;}
+  .acz-logo{font-size:22px;font-weight:900;letter-spacing:-.5px;color:#fff;}
+  .acz-logo span{color:var(--teal);}
+  .acz-badge{display:inline-block;margin-top:16px;background:rgba(20,169,185,.18);color:var(--teal);
+    font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:5px 12px;border-radius:20px;}
+  .acz-header h1{color:#fff;font-size:28px;font-weight:800;margin:14px 0 6px;line-height:1.15;}
+  .acz-header p{color:#B9C4DE;font-size:14px;margin:0;max-width:620px;}
+
+  .acz-wrap{padding:24px 28px 40px;max-width:1100px;margin:0 auto;}
+
+  .acz-inputs{background:#fff;border:1px solid var(--grey);border-radius:12px;padding:22px;
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:18px;}
+  .acz-field label{font-size:12px;font-weight:600;color:var(--body);margin-bottom:6px;display:block;letter-spacing:.2px;}
+  .acz-field input[type=number],.acz-field select{width:100%;padding:10px 12px;border:1px solid var(--grey);
+    border-radius:8px;font-size:15px;color:var(--dark);font-family:inherit;outline:none;}
+  .acz-field input[type=range]{width:100%;accent-color:var(--teal);margin-top:10px;}
+  .acz-range-scale{display:flex;justify-content:space-between;font-size:10px;color:var(--body);margin-top:2px;}
+  .acz-infl{color:var(--teal-dark);font-weight:700;}
+
+  .acz-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-top:18px;}
+  .acz-stat{border:1px solid var(--grey);border-radius:12px;padding:14px 16px;background:#fff;}
+  .acz-stat.pale{background:var(--teal-pale);}
+  .acz-stat.accent{background:var(--teal);border-color:var(--teal);}
+  .acz-stat .lbl{font-size:11px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;color:var(--body);}
+  .acz-stat.accent .lbl{color:rgba(255,255,255,.85);}
+  .acz-stat .val{font-size:22px;font-weight:800;margin-top:4px;color:var(--navy);}
+  .acz-stat.accent .val{color:#fff;}
+
+  .acz-note{margin-top:16px;background:var(--teal-pale);border-left:4px solid var(--teal);border-radius:8px;
+    padding:12px 16px;font-size:13.5px;color:var(--dark);line-height:1.55;}
+
+  .acz-card{background:#fff;border:1px solid var(--grey);border-radius:12px;margin-top:18px;}
+  .acz-card-title{font-size:15px;font-weight:700;color:var(--navy);padding:16px 18px 12px;}
+  .acz-chart-box{padding:8px 16px 16px;}
+
+  .acz-table-scroll{overflow-x:auto;border-radius:0 0 12px 12px;}
+  table.acz-table{width:100%;border-collapse:collapse;font-size:13px;}
+  table.acz-table thead tr{background:var(--navy);color:#fff;text-align:right;}
+  table.acz-table th{padding:11px 14px;font-size:11px;font-weight:700;letter-spacing:.3px;text-align:right;white-space:nowrap;}
+  table.acz-table th.left{text-align:left;}
+  table.acz-table td{padding:10px 14px;text-align:right;color:var(--dark);white-space:nowrap;}
+  table.acz-table td.left{text-align:left;}
+  table.acz-table td.bold{font-weight:700;}
+  table.acz-table tbody tr{border-bottom:1px solid var(--grey);}
+  .acz-min{color:var(--teal-dark);font-weight:700;}
+  .acz-pill{font-weight:700;font-size:11px;padding:3px 9px;border-radius:12px;}
+  .acz-pill.idx{background:var(--teal-pale);color:var(--teal-dark);}
+  .acz-pill.dsc{background:#EEF1F8;color:var(--navy);}
+
+  .acz-disclaimer{background:var(--navy-dark);border-radius:12px;padding:18px 20px;margin-top:22px;
+    color:#B9C4DE;font-size:12px;line-height:1.6;}
+  .acz-disclaimer strong.t{color:var(--teal);}
+  .acz-foot{text-align:center;margin-top:16px;font-size:11px;color:var(--body);}
+  .acz-foot span{color:var(--teal);font-weight:700;}
+</style>
+
+<script>
+(function () {
+  // ---- State ----
+  var state = { purchase:300000, sale:750000, rate:37, inflation:2.5, maxYears:30 };
+
+  // ---- Helpers ----
+  var fmt = function (n) {
+    return new Intl.NumberFormat('en-AU',{style:'currency',currency:'AUD',maximumFractionDigits:0})
+      .format(isFinite(n)?n:0);
+  };
+  var fmtPct = function (n){ return n.toFixed(1)+'%'; };
+
+  // ---- Compute series 1..maxYears ----
+  function compute(){
+    var rows=[], nominalGain=state.sale-state.purchase;
+    for(var y=1;y<=state.maxYears;y++){
+      var indexFactor=Math.pow(1+state.inflation/100,y);
+      var indexedCostBase=state.purchase*indexFactor;
+      var indexedGain=Math.max(0,state.sale-indexedCostBase);
+      var indexedTax=indexedGain*(state.rate/100);
+      var discountGain=Math.max(0,nominalGain)*0.5;
+      var discountTax=discountGain*(state.rate/100);
+      var minTax=indexedGain*0.30; // flat 30% of indexed gain, ignores bracket
+      rows.push({
+        year:y, indexedCostBase:indexedCostBase, indexedGain:indexedGain,
+        indexedTax:indexedTax, discountGain:discountGain, discountTax:discountTax,
+        minTax:minTax, better:(indexedTax<discountTax)?'Indexation':'Discount'
+      });
+    }
+    return rows;
+  }
+
+  // ---- One-time markup ----
+  function shell(){
+    return ''
+    +'<div class="acz-accent"></div>'
+    +'<div class="acz-header">'
+      +'<div class="acz-logo">Ace<span>biz</span></div>'
+      +'<div class="acz-badge">CGT Modelling Tool</div>'
+      +'<h1>Indexation vs 50% Discount</h1>'
+      +'<p>Compare the capital gains tax outcome of the indexation method against the 50% CGT discount across a 1–30 year holding period. Adjust the assumed inflation rate live to test sensitivity.</p>'
+    +'</div>'
+    +'<div class="acz-wrap">'
+      +'<div class="acz-inputs">'
+        +'<div class="acz-field"><label>PURCHASE PRICE / COST BASE</label><input type="number" id="acz-purchase"></div>'
+        +'<div class="acz-field"><label>SALE PRICE</label><input type="number" id="acz-sale"></div>'
+        +'<div class="acz-field"><label>MARGINAL TAX RATE</label><select id="acz-rate">'
+          +'<option value="0">0% – tax-free threshold</option>'
+          +'<option value="16">16% – $18,201–$45,000</option>'
+          +'<option value="30">30% – $45,001–$135,000</option>'
+          +'<option value="37">37% – $135,001–$190,000</option>'
+          +'<option value="45">45% – $190,001+</option>'
+        +'</select></div>'
+        +'<div class="acz-field"><label>ASSUMED AVG INFLATION: <span class="acz-infl" id="acz-infl-lbl"></span></label>'
+          +'<input type="range" id="acz-infl" min="0" max="8" step="0.1">'
+          +'<div class="acz-range-scale"><span>0%</span><span>8%</span></div>'
+        +'</div>'
+      +'</div>'
+      +'<div class="acz-stats" id="acz-stats"></div>'
+      +'<div class="acz-note" id="acz-note"></div>'
+      +'<div class="acz-card"><div class="acz-card-title">Tax payable by holding period</div>'
+        +'<div class="acz-chart-box"><canvas id="acz-chart" height="120"></canvas></div></div>'
+      +'<div class="acz-card"><div class="acz-card-title">Year-by-year comparison</div>'
+        +'<div class="acz-table-scroll"><table class="acz-table"><thead><tr>'
+          +'<th class="left">Year</th><th>Sale price</th><th>Indexed cost base</th><th>Indexed gain</th>'
+          +'<th>Indexation tax</th><th>Discount tax</th><th>Minimum tax</th><th>Cheaper</th>'
+        +'</tr></thead><tbody id="acz-tbody"></tbody></table></div></div>'
+      +'<div class="acz-disclaimer"><strong class="t">Important — illustrative model only.</strong> '
+        +'The indexation figures here are <strong>fictitious</strong>, generated from a single assumed average annual inflation rate compounded over the holding period. They are <em>not</em> the ATO\'s actual quarterly CPI indexation factors. In reality, indexation was frozen at 30 September 1999 and only applies to assets acquired before that date (frozen index number 123.4), and the 50% CGT discount applies only to assets held more than 12 months by individuals/trusts (one-third for complying super funds). The minimum tax column is a flat 30% of the indexed gain regardless of marginal rate. This tool is for comparative scenario modelling and education, not for preparing an actual CGT position. This contains general information only and does not constitute personal tax advice.</div>'
+      +'<div class="acz-foot">Ace<span>biz</span> · C&amp;S Partners Australia Pty Ltd · Norwest NSW</div>'
+    +'</div>';
+  }
+
+  // ---- Render dynamic bits ----
+  var chart=null;
+  function render(){
+    var rows=compute();
+    var nominalGain=state.sale-state.purchase;
+    var crossRow=rows.filter(function(d){return d.indexedTax<d.discountTax;})[0];
+    var crossover=crossRow?crossRow.year:null;
+
+    // Stats
+    document.getElementById('acz-stats').innerHTML=''
+      +stat('Nominal Gain',fmt(nominalGain),'pale')
+      +stat('Discount Method Gain (50%)',fmt(Math.max(0,nominalGain)*0.5),'pale')
+      +stat('Discount Method Tax (flat)',fmt(Math.max(0,nominalGain)*0.5*(state.rate/100)),'accent')
+      +stat('Crossover Year',crossover?('Year '+crossover):'Discount always wins',crossover?'accent':'');
+
+    // Note
+    document.getElementById('acz-note').innerHTML = crossover
+      ? 'At '+fmtPct(state.inflation)+' assumed inflation, the indexation method only becomes cheaper than the 50% discount from <strong>year '+crossover+'</strong> onward — because the indexed cost base needs time to erode the gain enough to beat a flat 50% haircut.'
+      : 'At '+fmtPct(state.inflation)+' assumed inflation, the 50% discount is cheaper across all 30 years. Raise the inflation assumption or lengthen the hold to find a crossover.';
+
+    // Table
+    var tb='';
+    for(var i=0;i<rows.length;i++){
+      var d=rows[i];
+      var pill=(d.better==='Indexation')
+        ? '<span class="acz-pill idx">Indexation</span>'
+        : '<span class="acz-pill dsc">Discount</span>';
+      tb+='<tr>'
+        +'<td class="left bold">'+d.year+'</td>'
+        +'<td>'+fmt(state.sale)+'</td>'
+        +'<td>'+fmt(d.indexedCostBase)+'</td>'
+        +'<td>'+fmt(d.indexedGain)+'</td>'
+        +'<td>'+fmt(d.indexedTax)+'</td>'
+        +'<td>'+fmt(d.discountTax)+'</td>'
+        +'<td class="bold"><span class="acz-min">'+fmt(d.minTax)+'</span></td>'
+        +'<td>'+pill+'</td>'
+      +'</tr>';
+    }
+    document.getElementById('acz-tbody').innerHTML=tb;
+
+    // Chart
+    var labels=rows.map(function(d){return d.year;});
+    var idxData=rows.map(function(d){return Math.round(d.indexedTax);});
+    var dscData=rows.map(function(d){return Math.round(d.discountTax);});
+    var minData=rows.map(function(d){return Math.round(d.minTax);});
+    if(chart){
+      chart.data.labels=labels;
+      chart.data.datasets[0].data=dscData;
+      chart.data.datasets[1].data=idxData;
+      chart.data.datasets[2].data=minData;
+      chart.update();
+    } else {
+      var ctx=document.getElementById('acz-chart').getContext('2d');
+      chart=new Chart(ctx,{
+        type:'line',
+        data:{labels:labels,datasets:[
+          {label:'Discount',data:dscData,borderColor:'#153A7C',borderWidth:2.5,pointRadius:0,tension:.25},
+          {label:'Indexation',data:idxData,borderColor:'#14A9B9',borderWidth:2.5,pointRadius:0,tension:.25},
+          {label:'Minimum tax (30% indexed)',data:minData,borderColor:'#C0392B',borderWidth:2,borderDash:[5,4],pointRadius:0,tension:.25}
+        ]},
+        options:{
+          responsive:true,maintainAspectRatio:true,
+          interaction:{mode:'index',intersect:false},
+          plugins:{
+            legend:{labels:{font:{family:"'IBM Plex Sans',Arial",size:12},color:'#4B5563'}},
+            tooltip:{callbacks:{
+              title:function(it){return 'Year '+it[0].label;},
+              label:function(it){return it.dataset.label+': '+fmt(it.parsed.y);}
+            }}
+          },
+          scales:{
+            x:{title:{display:true,text:'Years held',color:'#4B5563',font:{size:11}},
+               ticks:{color:'#4B5563',font:{size:11}},grid:{color:'#E5E7EB'}},
+            y:{ticks:{color:'#4B5563',font:{size:11},callback:function(v){return '$'+(v/1000).toFixed(0)+'k';}},
+               grid:{color:'#E5E7EB'}}
+          }
+        }
+      });
+    }
+  }
+
+  function stat(lbl,val,cls){
+    return '<div class="acz-stat '+(cls||'')+'"><div class="lbl">'+lbl+'</div><div class="val">'+val+'</div></div>';
+  }
+
+  // ---- Wire inputs ----
+  function bind(){
+    var p=document.getElementById('acz-purchase'),
+        s=document.getElementById('acz-sale'),
+        r=document.getElementById('acz-rate'),
+        inf=document.getElementById('acz-infl'),
+        infl=document.getElementById('acz-infl-lbl');
+    p.value=state.purchase; s.value=state.sale; r.value=state.rate;
+    inf.value=state.inflation; infl.textContent=fmtPct(state.inflation);
+
+    p.addEventListener('input',function(){state.purchase=+p.value||0;render();});
+    s.addEventListener('input',function(){state.sale=+s.value||0;render();});
+    r.addEventListener('change',function(){state.rate=+r.value;render();});
+    inf.addEventListener('input',function(){state.inflation=+inf.value;infl.textContent=fmtPct(state.inflation);render();});
+  }
+
+  // ---- Init ----
+  function init(){
+    document.getElementById('acebiz-cgt-tool').innerHTML=shell();
+    bind();
+    render();
+  }
+  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init);}else{init();}
+})();
+</script>
