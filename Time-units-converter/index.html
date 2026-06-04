@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Acebiz — Time to Units Converter</title>
+<style>
+  :root{
+    --navy:#153A7C; --navy-dark:#0E1B3A; --navy-deep:#172755; --navy-mid:#2C3E73;
+    --navy-light:#5B6C9E; --teal:#14A9B9; --teal-dark:#0E7F8B; --teal-mid:#5FC7D2;
+    --teal-pale:#D6F1F4; --dark:#1F2933; --text-body:#4B5563; --light-grey:#E5E7EB;
+    --off-white:#F8FAFC; --white:#FFFFFF; --alert:#C0392B;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'IBM Plex Sans',-apple-system,sans-serif;background:var(--off-white);color:var(--dark);line-height:1.6;-webkit-font-smoothing:antialiased;}
+  .accent-line{height:4px;background:var(--teal);}
+  header{background:var(--navy);padding:20px 24px;}
+  .wordmark{font-family:'Outfit',sans-serif;font-weight:900;font-size:26px;color:var(--white);letter-spacing:-0.5px;}
+  .wordmark .biz{color:var(--teal);}
+  .hero{background:linear-gradient(135deg,var(--navy-dark),var(--navy-mid));padding:36px 24px;text-align:center;}
+  .eyebrow{display:inline-block;background:rgba(20,169,185,0.18);color:var(--teal-mid);font-family:'Outfit',sans-serif;font-weight:600;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;padding:6px 14px;border-radius:6px;margin-bottom:14px;}
+  .hero h1{font-family:'Outfit',sans-serif;font-weight:800;font-size:28px;color:var(--white);margin-bottom:8px;}
+  .hero p{color:var(--teal-mid);font-size:15px;max-width:520px;margin:0 auto;}
+  .container{max-width:760px;margin:0 auto;padding:32px 24px 48px;}
+  .card{background:var(--white);border:1px solid var(--light-grey);border-radius:12px;padding:28px;margin-bottom:24px;}
+  .card h2{font-family:'Outfit',sans-serif;font-weight:800;font-size:18px;color:var(--navy);margin-bottom:18px;}
+  .converter-grid{display:grid;grid-template-columns:1fr auto 1fr;gap:18px;align-items:end;}
+  label{display:block;font-weight:600;font-size:13px;color:var(--text-body);margin-bottom:8px;}
+  input[type=number]{width:100%;font-family:'IBM Plex Sans',sans-serif;font-size:22px;font-weight:600;color:var(--navy);padding:14px 16px;border:2px solid var(--light-grey);border-radius:8px;background:var(--white);transition:border-color .15s;}
+  input[type=number]:focus{outline:none;border-color:var(--teal);}
+  .arrow{font-size:24px;color:var(--teal);padding-bottom:14px;font-weight:800;}
+  .result-box{background:var(--teal-pale);border:2px solid var(--teal);border-radius:8px;padding:14px 16px;text-align:center;}
+  .result-box .units{font-family:'Outfit',sans-serif;font-weight:900;font-size:30px;color:var(--navy);line-height:1;}
+  .result-box .lbl{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--teal-dark);font-weight:600;margin-top:4px;}
+  .helptext{font-size:13px;color:var(--text-body);margin-top:14px;}
+  .mode-toggle{display:flex;gap:8px;margin-bottom:20px;}
+  .mode-btn{flex:1;font-family:'Outfit',sans-serif;font-weight:600;font-size:14px;padding:10px;border:2px solid var(--light-grey);background:var(--white);color:var(--navy-light);border-radius:8px;cursor:pointer;transition:all .15s;}
+  .mode-btn.active{background:var(--navy);border-color:var(--navy);color:var(--white);}
+  table{width:100%;border-collapse:collapse;font-size:14px;}
+  th{background:var(--navy);color:var(--white);font-family:'Outfit',sans-serif;font-weight:600;text-align:left;padding:10px 14px;font-size:13px;}
+  td{padding:10px 14px;border-bottom:1px solid var(--light-grey);}
+  tr:nth-child(even) td{background:var(--off-white);}
+  td.unit{font-weight:600;color:var(--teal-dark);}
+  .shift-grid{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:14px;align-items:end;}
+  .plus{font-size:24px;color:var(--navy-light);padding-bottom:14px;font-weight:800;}
+  .quick-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px;}
+  .quick-btn{font-family:'Outfit',sans-serif;font-weight:600;font-size:14px;padding:14px 8px;border:2px solid var(--teal-pale);background:var(--teal-pale);color:var(--navy);border-radius:8px;cursor:pointer;transition:all .15s;text-align:center;}
+  .quick-btn:hover{border-color:var(--teal);background:var(--white);}
+  .quick-btn span{display:block;font-size:11px;color:var(--teal-dark);font-weight:500;margin-top:2px;}
+  footer{background:var(--navy-dark);color:var(--navy-light);text-align:center;padding:24px;font-size:12px;}
+  footer .wordmark{font-size:18px;margin-bottom:8px;}
+  @media(max-width:560px){.converter-grid{grid-template-columns:1fr;}.arrow{display:none;}.shift-grid{grid-template-columns:1fr 1fr;}.shift-grid .plus{display:none;}.shift-grid .result-box{grid-column:1/3;}}
+</style>
+</head>
+<body>
+<div class="accent-line"></div>
+<header><span class="wordmark">Ace<span class="biz">biz</span></span></header>
+
+<div class="hero">
+  <span class="eyebrow">Timesheet Helper</span>
+  <h1>Time to Units Converter</h1>
+  <p>Convert minutes worked into decimal units (1 unit = 60 minutes) for timesheet and billing entry.</p>
+</div>
+
+<div class="container">
+  <div class="card">
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="m2u" onclick="setMode('m2u')">Minutes → Units</button>
+      <button class="mode-btn" id="u2m" onclick="setMode('u2m')">Units → Minutes</button>
+    </div>
+
+    <div class="converter-grid">
+      <div>
+        <label id="inLabel">Minutes worked</label>
+        <input type="number" id="inputVal" min="0" step="1" placeholder="0" oninput="convert()">
+      </div>
+      <div class="arrow">→</div>
+      <div class="result-box">
+        <div class="units" id="resultVal">0.00</div>
+        <div class="lbl" id="resultLabel">Units</div>
+      </div>
+    </div>
+    <p class="helptext" id="hint">Enter minutes — 15 min = 0.25, 30 min = 0.50, 45 min = 0.75, 60 min = 1.00.</p>
+  </div>
+
+  <div class="card">
+    <h2>Shift calculator — hours &amp; minutes</h2>
+    <div class="shift-grid">
+      <div>
+        <label>Hours</label>
+        <input type="number" id="shiftHrs" min="0" step="1" placeholder="0" oninput="shiftConvert()">
+      </div>
+      <div class="plus">+</div>
+      <div>
+        <label>Minutes</label>
+        <input type="number" id="shiftMins" min="0" max="59" step="1" placeholder="0" oninput="shiftConvert()">
+      </div>
+      <div class="arrow">→</div>
+      <div class="result-box">
+        <div class="units" id="shiftResult">0.00</div>
+        <div class="lbl">Units</div>
+      </div>
+    </div>
+    <p class="helptext">A 7 hr 20 min shift = 7.33 units. Whole hours convert 1:1; only the minutes need converting.</p>
+  </div>
+
+  <div class="card">
+    <h2>Quick minutes (under 1 hour)</h2>
+    <div class="quick-grid">
+      <button class="quick-btn" onclick="quick(5)">5 min<span>0.08</span></button>
+      <button class="quick-btn" onclick="quick(10)">10 min<span>0.17</span></button>
+      <button class="quick-btn" onclick="quick(15)">15 min<span>0.25</span></button>
+      <button class="quick-btn" onclick="quick(20)">20 min<span>0.33</span></button>
+      <button class="quick-btn" onclick="quick(25)">25 min<span>0.42</span></button>
+      <button class="quick-btn" onclick="quick(30)">30 min<span>0.50</span></button>
+      <button class="quick-btn" onclick="quick(35)">35 min<span>0.58</span></button>
+      <button class="quick-btn" onclick="quick(40)">40 min<span>0.67</span></button>
+      <button class="quick-btn" onclick="quick(45)">45 min<span>0.75</span></button>
+      <button class="quick-btn" onclick="quick(50)">50 min<span>0.83</span></button>
+      <button class="quick-btn" onclick="quick(55)">55 min<span>0.92</span></button>
+      <button class="quick-btn" onclick="quick(60)">60 min<span>1.00</span></button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Reference table</h2>
+    <table>
+      <thead><tr><th>Minutes</th><th>Units</th><th>Minutes</th><th>Units</th></tr></thead>
+      <tbody id="refTable"></tbody>
+    </table>
+  </div>
+</div>
+
+<footer>
+  <div class="wordmark">Ace<span style="color:var(--teal)">biz</span></div>
+  C&amp;S Partners Australia Pty Ltd · 204/11 Solent Circuit, Norwest NSW 2153<br>
+  Internal timesheet tool · 1 unit = 60 minutes
+</footer>
+
+<script>
+  var mode='m2u';
+  function setMode(m){
+    mode=m;
+    document.getElementById('m2u').classList.toggle('active',m==='m2u');
+    document.getElementById('u2m').classList.toggle('active',m==='u2m');
+    var inp=document.getElementById('inputVal');
+    if(m==='m2u'){
+      document.getElementById('inLabel').textContent='Minutes worked';
+      document.getElementById('resultLabel').textContent='Units';
+      inp.step='1'; inp.placeholder='0';
+      document.getElementById('hint').textContent='Enter minutes — 15 min = 0.25, 30 min = 0.50, 45 min = 0.75, 60 min = 1.00.';
+    } else {
+      document.getElementById('inLabel').textContent='Units';
+      document.getElementById('resultLabel').textContent='Minutes';
+      inp.step='0.25'; inp.placeholder='0.00';
+      document.getElementById('hint').textContent='Enter units — 0.25 = 15 min, 0.50 = 30 min, 1.00 = 60 min.';
+    }
+    inp.value=''; convert();
+  }
+  function convert(){
+    var v=parseFloat(document.getElementById('inputVal').value)||0;
+    var out;
+    if(mode==='m2u'){ out=(v/60).toFixed(2); }
+    else { out=Math.round(v*60); }
+    document.getElementById('resultVal').textContent=out;
+  }
+  function quick(min){
+    setMode('m2u');
+    document.getElementById('m2u').classList.add('active');
+    document.getElementById('u2m').classList.remove('active');
+    document.getElementById('inputVal').value=min;
+    convert();
+  }
+  function shiftConvert(){
+    var h=parseFloat(document.getElementById('shiftHrs').value)||0;
+    var m=parseFloat(document.getElementById('shiftMins').value)||0;
+    var total=h + (m/60);
+    document.getElementById('shiftResult').textContent=total.toFixed(2);
+  }
+  (function buildTable(){
+    var rows=[15,30,45,60,75,90,105,120,135,150,165,180];
+    var html='';
+    for(var i=0;i<rows.length;i+=2){
+      var a=rows[i], b=rows[i+1];
+      html+='<tr><td>'+a+' min</td><td class="unit">'+(a/60).toFixed(2)+'</td>'+
+            '<td>'+b+' min</td><td class="unit">'+(b/60).toFixed(2)+'</td></tr>';
+    }
+    document.getElementById('refTable').innerHTML=html;
+  })();
+  convert();
+</script>
+</body>
+</html>
