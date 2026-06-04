@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FBT Car Benefit Calculator — Acebiz</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #2C3E73; --navy-dark: #172755; --navy-darkest: #0E1B3A;
+    --teal: #14A9B9; --teal-light: #5FC7D2; --teal-bg: #D6F1F4;
+    --green: #38a169; --green-dark: #276749;
+    --red: #C0392B; --amber: #d69e2e; --amber-text: #975a16;
+    --slate: #0E7F8B; --purple: #153A7C;
+    --ink: #1F2933; --muted: #4B5563; --grey: #718096; --light-grey: #a0aec0;
+    --border: #E5E7EB; --bg: #F8FAFC;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'IBM Plex Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif; background: var(--bg); min-height: 100vh; color: var(--ink); }
+  input[type=number] { -moz-appearance: textfield; }
+  input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+  .accent-line { height: 4px; background: var(--teal); }
+  .header { background: linear-gradient(135deg, #0E1B3A 0%, #172755 45%, #2C3E73 100%); padding: 26px 20px 20px; color: #fff; }
+  .header-inner { max-width: 820px; margin: 0 auto; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 10px; }
+  .wordmark { font-family: 'Outfit', sans-serif; font-size: 24px; font-weight: 900; letter-spacing: -0.01em; margin-bottom: 8px; line-height: 1; }
+  .wordmark .biz { color: var(--teal); }
+  .tool-tag { font-size: 10px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--teal-light); margin-bottom: 6px; }
+  .header h1 { font-family: 'Outfit', sans-serif; font-size: 26px; font-weight: 800; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .header .sub { font-size: 12px; opacity: 0.75; margin: 0; }
+  .pdf-btn { font-family: 'IBM Plex Sans', sans-serif; padding: 11px 22px; font-size: 12.5px; font-weight: 700; color: #fff; background: var(--teal); border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 10px rgba(20,169,185,0.4); display: flex; align-items: center; gap: 6px; }
+  .pdf-btn:disabled { opacity: 0.7; cursor: wait; }
+
+  .container { max-width: 820px; margin: 0 auto; padding: 0 14px; }
+  .tabs { display: flex; margin: 14px 0; background: #edf2f7; border-radius: 9px; padding: 3px; }
+  .tab-btn { flex: 1; padding: 9px 0; font-size: 12.5px; font-weight: 700; border: none; border-radius: 7px; cursor: pointer; background: transparent; color: var(--grey); font-family: inherit; }
+  .tab-btn.active { background: #fff; color: var(--teal); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+  .card { background: #fff; border-radius: 12px; padding: 20px 18px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 14px; }
+  .card-tight { padding: 16px 18px; }
+  .section { margin-bottom: 24px; }
+  .section:last-child { margin-bottom: 0; }
+  .section-title { font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; padding-bottom: 7px; border-bottom: 2px solid; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 9px; }
+
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); margin-bottom: 3px; }
+  .field-row { display: flex; align-items: center; gap: 5px; }
+  .field .prefix { font-size: 13px; color: var(--grey); font-weight: 600; }
+  .field .suffix { font-size: 12px; color: var(--grey); }
+  .field input { flex: 1; padding: 9px 11px; font-size: 14px; border: 1.5px solid var(--border); border-radius: 7px; outline: none; background: #fff; color: var(--ink); font-weight: 500; font-family: monospace; width: 100%; }
+  .field input:focus { border-color: var(--navy); }
+  .field .help { font-size: 11px; color: var(--light-grey); margin-top: 2px; }
+
+  .toggle { margin-bottom: 14px; }
+  .toggle-head { display: flex; align-items: center; gap: 9px; cursor: pointer; }
+  .toggle-track { width: 40px; height: 22px; border-radius: 11px; background: var(--border); position: relative; transition: background 0.2s; flex-shrink: 0; }
+  .toggle-track.on { background: var(--navy); }
+  .toggle-knob { width: 16px; height: 16px; border-radius: 50%; background: #fff; position: absolute; top: 3px; left: 3px; transition: left 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+  .toggle-track.on .toggle-knob { left: 21px; }
+  .toggle-label { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+  .toggle .help { font-size: 11px; color: var(--light-grey); margin-top: 3px; margin-left: 49px; }
+
+  .result-card { border-radius: 11px; padding: 12px 14px; text-align: center; border: 1.5px solid; }
+  .result-card.large { padding: 18px 16px; }
+  .result-card .rc-title { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 3px; }
+  .result-card .rc-value { font-size: 20px; font-weight: 800; color: var(--ink); font-family: monospace; }
+  .result-card.large .rc-value { font-size: 26px; }
+  .result-card .rc-sub { font-size: 10.5px; color: var(--grey); margin-top: 2px; }
+
+  .calc-box { border-radius: 9px; padding: 14px; margin-bottom: 14px; font-size: 12.5px; line-height: 1.8; font-family: monospace; }
+  .calc-box.amber { background: #fffff0; border: 1px solid #fefcbf; color: #744210; }
+  .calc-box.teal { background: var(--teal-bg); border: 1px solid var(--teal-light); color: var(--purple); }
+  .calc-box .divider { margin-top: 6px; padding-top: 6px; border-top: 1px dashed; }
+
+  .mono { font-family: monospace; }
+  .crow { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 8px; padding: 7px 0; border-bottom: 1px solid #edf2f7; }
+  .crow .lbl { font-size: 12.5px; color: var(--muted); font-weight: 500; }
+  .crow .val { font-size: 12.5px; font-weight: 600; color: var(--ink); text-align: right; font-family: monospace; }
+  .crow .val.better { color: var(--green); }
+
+  table.opt { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.opt th { padding: 9px 6px; text-align: right; font-weight: 700; color: var(--muted); border-bottom: 2px solid #e2e8f0; font-size: 10.5px; white-space: nowrap; }
+  table.opt td { padding: 7px 6px; text-align: right; font-family: monospace; }
+
+  .banner { border-radius: 11px; padding: 12px 16px; margin-bottom: 14px; display: flex; gap: 10px; }
+  .banner.cap { background: #fffff0; border: 1.5px solid #f6e05e; }
+  .banner.ev { background: linear-gradient(135deg, #38a169, #48bb78); color: #fff; text-align: center; display: block; padding: 14px 18px; }
+
+  .method-card { flex: 1; text-align: left; padding: 12px 14px; border: 2px solid #e2e8f0; border-radius: 10px; background: #fff; cursor: pointer; font-family: inherit; }
+  .method-card.sel { border-color: var(--teal); background: var(--teal-bg); }
+  .method-card .mc-title { font-size: 13.5px; font-weight: 800; color: var(--muted); margin-bottom: 2px; }
+  .method-card.sel .mc-title { color: var(--teal); }
+  .method-card .mc-desc { font-size: 11px; color: var(--grey); line-height: 1.5; }
+
+  .seg-btn { flex: 1; padding: 9px 8px; font-size: 12px; font-weight: 600; border: 1.5px solid var(--border); border-radius: 7px; background: #fff; color: var(--grey); cursor: pointer; font-family: inherit; }
+  .seg-btn.sel { border-color: var(--slate); background: rgba(14,127,139,0.06); color: var(--slate); }
+
+  .hidden { display: none !important; }
+  .footer { padding: 10px 0 20px; text-align: center; }
+  .footer-text { font-size: 10.5px; color: var(--light-grey); }
+  input[type=range] { accent-color: var(--teal); }
+</style>
+</head>
+<body>
+  <div class="accent-line"></div>
+  <div class="header">
+    <div class="header-inner">
+      <div>
+        <div class="wordmark">Ace<span class="biz">biz</span></div>
+        <div class="tool-tag">FBT Advisory Tool</div>
+        <h1>FBT Car Benefit Calculator</h1>
+        <p class="sub" id="headerSub">FBT year ending 31 March 2026 · Rate 47% · Statutory formula</p>
+      </div>
+      <button class="pdf-btn" id="pdfBtn">📄 <span id="pdfBtnText">Export to PDF</span></button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="tabs" id="tabs"></div>
+
+    <!-- FBT METHOD SELECTOR -->
+    <div class="card card-tight">
+      <div style="font-size:13px;font-weight:800;color:var(--purple);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">FBT Valuation Method</div>
+      <div style="display:flex;gap:10px;" id="methodSelector"></div>
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid #edf2f7;">
+        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:6px;">
+          Business / Work Use % <span style="color:var(--grey);font-weight:400;">(from logbook) — Private use is <span id="privUseLabel">30</span>%</span>
+        </label>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <input type="range" min="0" max="100" step="1" id="bizUseRange" style="flex:1;">
+          <div style="display:flex;align-items:center;gap:4px;min-width:90px;">
+            <input type="number" min="0" max="100" id="bizUseNum" style="width:56px;padding:6px 8px;font-size:14px;border:1.5px solid var(--border);border-radius:7px;text-align:right;font-family:monospace;font-weight:600;">
+            <span style="font-size:13px;color:var(--grey);font-weight:600;">%</span>
+          </div>
+        </div>
+        <p style="font-size:11px;color:var(--light-grey);margin-top:6px;" id="bizUseHelp"></p>
+      </div>
+    </div>
+
+    <!-- INPUTS -->
+    <div class="card">
+      <div class="section">
+        <div class="section-title" style="color:var(--teal);border-color:rgba(20,169,185,0.25);">Vehicle Details</div>
+        <div class="grid-2">
+          <div class="field"><label>Car Purchase Price (inc. GST &amp; LCT)</label><div class="field-row"><span class="prefix">$</span><input type="number" id="carValue"></div><p class="help">Total cost inc. dealer delivery, GST, LCT</p></div>
+          <div class="field"><label>Employee Upfront Payment</label><div class="field-row"><span class="prefix">$</span><input type="number" id="upfront"></div><p class="help">Cash paid at acquisition</p></div>
+          <div class="field"><label>Days Car Held in Year</label><div class="field-row"><input type="number" id="days" min="0" max="366"><span class="suffix">days</span></div><p class="help">Days the car was held during the FBT year</p></div>
+          <div class="field"><label>Years Car Held</label><div class="field-row"><input type="number" id="carAge" min="0" max="20"><span class="suffix">years</span></div><p class="help">4+ years: base value x 2/3</p></div>
+        </div>
+        <div class="grid-2">
+          <div class="toggle"><div class="toggle-head" data-toggle="isEV"><div class="toggle-track"><div class="toggle-knob"></div></div><span class="toggle-label">Electric Vehicle (BEV / Hydrogen)</span></div><p class="help">Exempt if ≤ $91,387. PHEVs excluded from 1 Apr 2025</p></div>
+          <div class="toggle"><div class="toggle-head" data-toggle="gstCred"><div class="toggle-track"><div class="toggle-knob"></div></div><span class="toggle-label">Employer Claims GST Credit (Type 1)</span></div><p class="help">Type 1: 2.0802 / Type 2: 1.8868</p></div>
+        </div>
+      </div>
+
+      <!-- Days available (statutory only) -->
+      <div class="section" id="daysSection">
+        <div class="section-title" style="color:var(--amber);border-color:rgba(214,158,46,0.25);">Days Available for Private Use</div>
+        <div class="grid-2" style="align-items:start;">
+          <div class="field"><label>Less: Days Kept at Business Premises</label><div class="field-row"><input type="number" id="daysAtPremises" min="0"><span class="suffix">days</span></div><p class="help">Days the car was kept at business premises and NOT available for private use</p></div>
+          <div class="field">
+            <label>Days Available for Private Use</label>
+            <div style="padding:9px 11px;font-size:16px;font-weight:800;font-family:monospace;color:var(--amber);background:#fffaf0;border:1.5px solid #fbd38d;border-radius:7px;">
+              <span id="daysPrivateVal">365</span> days <span style="font-size:11px;color:var(--light-grey);font-weight:400;" id="daysPrivateCalc"></span>
+            </div>
+            <p class="help">Statutory taxable value scales by <span id="daysPrivateScale">365</span>/365.</p>
+          </div>
+        </div>
+        <div style="background:#fffaf0;border:1px solid #fbd38d;border-radius:8px;padding:10px 12px;font-size:11.5px;color:var(--amber-text);line-height:1.6;">
+          <strong>⚠ Audit trap:</strong> A car garaged at or near the employee's home is treated as available for private use — even for security only, and even if private use isn't permitted. These days only reduce the count if the car is genuinely kept at the business premises (not the employee's residence) for the whole day, with keys/control surrendered. Keep a days-unavailable declaration.
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title" style="color:var(--green);border-color:rgba(56,161,105,0.25);">Employee Contributions</div>
+        <div class="grid-2" style="align-items:start;">
+          <div>
+            <div class="field"><label>Annual Post-Tax Contribution</label><div class="field-row"><span class="prefix">$</span><input type="number" id="aContrib"></div><p class="help">After-tax cash paid to employer over the year</p></div>
+            <div style="margin-top:-6px;margin-bottom:10px;font-size:11.5px;color:var(--green);font-weight:600;font-family:monospace;">≈ <span id="contribMonthly">$0.00</span> / month</div>
+          </div>
+          <div class="field"><label>Annual Third-Party Expenses</label><div class="field-row"><span class="prefix">$</span><input type="number" id="tpExp"></div><p class="help">Fuel, servicing (unreimbursed)</p></div>
+        </div>
+        <div class="field"><label>Employee's Annual Salary</label><div class="field-row"><span class="prefix">$</span><input type="number" id="salary"></div><p class="help">For marginal rate analysis</p></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title" style="color:var(--slate);border-color:rgba(14,127,139,0.25);">Vehicle Running Costs &amp; Depreciation</div>
+        <div class="grid-2">
+          <div class="field"><label>Annual Running Costs</label><div class="field-row"><span class="prefix">$</span><input type="number" id="running"></div><p class="help">Fuel, rego, insurance, maintenance</p></div>
+          <div class="field"><label>Annual Loan Interest</label><div class="field-row"><span class="prefix">$</span><input type="number" id="interest"></div><p class="help">Interest on company car loan</p></div>
+        </div>
+        <div class="grid-2">
+          <div class="field"><label>Depreciation Method</label><div style="display:flex;gap:8px;" id="depMethodSeg"></div></div>
+          <div class="toggle"><div class="toggle-head" data-toggle="isBRE"><div class="toggle-track"><div class="toggle-knob"></div></div><span class="toggle-label">Base Rate Entity (25% tax)</span></div><p class="help">Uncheck for 30%</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Alert banners -->
+    <div id="capBanner" class="banner cap hidden">
+      <span style="font-size:18px;">⚠️</span>
+      <div><div style="font-size:13px;font-weight:700;color:var(--amber-text);margin-bottom:2px;">ATO Car Depreciation Limit Applied</div>
+      <div style="font-size:12px;color:#744210;" id="capBannerText"></div></div>
+    </div>
+    <div id="evBanner" class="banner ev hidden">
+      <div style="font-size:16px;font-weight:800;">✓ FBT EXEMPT — Electric Vehicle</div>
+      <div style="font-size:12px;opacity:0.9;">No FBT payable. Reportable FBT still applies.</div>
+    </div>
+
+    <!-- TAB PANELS -->
+    <div id="panel-calc"></div>
+    <div id="panel-vehicle" class="hidden"></div>
+    <div id="panel-compare" class="hidden"></div>
+    <div id="panel-structure" class="hidden"></div>
+    <div id="panel-optimize" class="hidden"></div>
+
+    <div class="footer">
+      <div class="footer-text">Illustrative only — not financial/tax advice. ATO rates FBT year ending 31 Mar 2026. © Acebiz</div>
+    </div>
+  </div>
+
+<script>
+/* ═══════════════ CONSTANTS ═══════════════ */
+var FBT_RATE = 0.47;
+var GROSS_UP_TYPE1 = 2.0802;
+var GROSS_UP_TYPE2 = 1.8868;
+var STATUTORY_RATE = 0.20;
+var GST_FRACTION = 1 / 11;
+var DAYS_IN_YEAR = 365;
+var COMPANY_TAX_RATE_BRE = 0.25;
+var COMPANY_TAX_RATE_FULL = 0.30;
+var ATO_CAR_LIMIT = 69674;
+var MARGINAL_RATES = [
+  { max: 18200, rate: 0 },
+  { max: 45000, rate: 0.16 },
+  { max: 135000, rate: 0.30 },
+  { max: 190000, rate: 0.37 },
+  { max: Infinity, rate: 0.45 }
+];
+var MEDICARE_LEVY = 0.02;
+var DEP_RATES = { prime: 0.125, diminishing: 0.25 };
+var FBT_DEEMED_DEP_RATE = 0.25;
+var FBT_BENCHMARK_INTEREST = 0.0862;
+
+/* ═══════════════ HELPERS ═══════════════ */
+function calcMarginalRate(income) {
+  for (var i = 0; i < MARGINAL_RATES.length; i++) {
+    if (income <= MARGINAL_RATES[i].max) return MARGINAL_RATES[i].rate + MEDICARE_LEVY;
+  }
+  return 0.47;
+}
+function fmt(n) {
+  if (n == null || isNaN(n)) return "$0";
+  return new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
+}
+function fmtDec(n) {
+  if (n == null || isNaN(n)) return "$0.00";
+  return new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+}
+function pct(n) { return (n * 100).toFixed(1) + "%"; }
+function rnd(n) { return Math.round(n * 100) / 100; }
+function esc(s) { return String(s); }
+
+/* ═══════════════ STATE ═══════════════ */
+var state = {
+  carValue: 170000, upfront: 30000, days: 365, daysAtPremises: 0,
+  isEV: false, carAge: 0, aContrib: 28000, tpExp: 0, salary: 150000,
+  gstCred: true, running: 8000, interest: 9000, depM: "diminishing",
+  isBRE: true, method: "statutory", bizUse: 70, tab: "calc"
+};
+
+/* ═══════════════ COMPUTE ═══════════════ */
+function compute() {
+  var s = state;
+  var baseValue = s.carAge >= 4 ? (s.carValue - s.upfront) * (2 / 3) : s.carValue - s.upfront;
+  var statDaysPrivate = Math.max(0, Math.min(s.days, s.days - s.daysAtPremises));
+  var stv = baseValue * STATUTORY_RATE * (statDaysPrivate / DAYS_IN_YEAR);
+  var ac = s.aContrib + s.tpExp;
+  var gr = s.gstCred ? GROSS_UP_TYPE1 : GROSS_UP_TYPE2;
+  var evEx = s.isEV && s.carValue <= 91387;
+
+  // Operating cost (logbook) method
+  var privFrac = Math.max(0, Math.min(1, 1 - s.bizUse / 100));
+  var openingWDV = s.carValue * Math.pow(1 - FBT_DEEMED_DEP_RATE, s.carAge);
+  var deemedDep = openingWDV * FBT_DEEMED_DEP_RATE * (s.days / DAYS_IN_YEAR);
+  var deemedInt = openingWDV * FBT_BENCHMARK_INTEREST * (s.days / DAYS_IN_YEAR);
+  var totalOpCosts = s.running + deemedDep + deemedInt;
+  var ocBefore = totalOpCosts * privFrac;
+
+  var taxableBeforeContrib = s.method === "operating" ? ocBefore : stv;
+  var tvac = Math.max(0, taxableBeforeContrib - ac);
+  var fbtNo = evEx ? 0 : taxableBeforeContrib * gr * FBT_RATE;
+  var fbtWith = evEx ? 0 : tvac * gr * FBT_RATE;
+  var fbtSaved = fbtNo - fbtWith;
+  var gstOnC = s.gstCred ? ac * GST_FRACTION : 0;
+  var czero = taxableBeforeContrib;
+  var mzero = Math.max(0, (czero - s.tpExp) / 12);
+  var mr = calcMarginalRate(s.salary);
+  var pe = mr < 1 ? ac / (1 - mr) : ac;
+  var ctr = s.isBRE ? COMPANY_TAX_RATE_BRE : COMPANY_TAX_RATE_FULL;
+  var actualCost = s.carValue - s.upfront;
+  var gstCreditPurchase = s.gstCred ? Math.min(s.carValue * GST_FRACTION, ATO_CAR_LIMIT * GST_FRACTION) : 0;
+  var costExGST = s.gstCred ? actualCost - actualCost * GST_FRACTION : actualCost;
+  var limitExGST = s.gstCred ? ATO_CAR_LIMIT - ATO_CAR_LIMIT * GST_FRACTION : ATO_CAR_LIMIT;
+  var depBase = Math.min(costExGST, limitExGST);
+  var capped = costExGST > limitExGST;
+  var dep = depBase * DEP_RATES[s.depM];
+  var td = dep + s.running + s.interest + fbtWith;
+  var tdNo = dep + s.running + s.interest + fbtNo;
+  var ctb = td * ctr;
+  var ctbNo = tdNo * ctr;
+  var rfbtNo = evEx ? 0 : taxableBeforeContrib * GROSS_UP_TYPE2;
+  var rfbtWith = evEx ? 0 : tvac * GROSS_UP_TYPE2;
+
+  var statFbt = evEx ? 0 : stv * gr * FBT_RATE;
+  var ocFbt = evEx ? 0 : ocBefore * gr * FBT_RATE;
+
+  // Business vs Personal
+  var bizFrac = 1 - privFrac;
+  var fbtCompare = fbtNo;
+  var bizTaxShield = (s.running + s.interest + dep + fbtCompare) * ctr;
+  var netBusinessAnnual = s.running + s.interest + fbtCompare - bizTaxShield;
+  var personalDepBase = Math.min(s.carValue, ATO_CAR_LIMIT);
+  var personalDep = personalDepBase * DEP_RATES[s.depM];
+  var personalDeduction = bizFrac * (s.running + s.interest + personalDep) * mr;
+  var netPersonalAnnual = s.running + s.interest - personalDeduction;
+  var businessBetterBy = netPersonalAnnual - netBusinessAnnual;
+
+  return {
+    baseValue: baseValue, statutoryTaxableValue: stv, statDaysPrivate: statDaysPrivate, method: s.method,
+    taxableBeforeContrib: taxableBeforeContrib, privFrac: privFrac, bizFrac: bizFrac,
+    openingWDV: openingWDV, deemedDep: deemedDep, deemedInt: deemedInt, totalOpCosts: totalOpCosts, ocTaxableValue: ocBefore,
+    statFbt: statFbt, ocFbt: ocFbt,
+    fbtCompare: fbtCompare, bizTaxShield: bizTaxShield, netBusinessAnnual: netBusinessAnnual,
+    personalDep: personalDep, personalDeduction: personalDeduction, netPersonalAnnual: netPersonalAnnual, businessBetterBy: businessBetterBy,
+    annualContrib: ac, taxableValueAfterContrib: tvac, grossUpRate: gr, evExempt: evEx,
+    fbtNoContrib: fbtNo, fbtWithContrib: fbtWith, fbtSaved: fbtSaved, gstOnContrib: gstOnC,
+    contribRequiredForZero: czero, monthlyRequiredForZero: mzero, marginalRate: mr,
+    afterTaxCostOfContrib: ac, preTaxEquivalent: pe, companyTaxRate: ctr, actualCost: actualCost,
+    gstCreditOnPurchase: gstCreditPurchase, costExGST: costExGST, atoLimitExGST: limitExGST,
+    depreciableBaseCapped: depBase, isCapped: capped, depreciation: dep,
+    totalDeductible: td, totalDeductibleNoContrib: tdNo, companyTaxBenefit: ctb, companyTaxBenefitNoContrib: ctbNo,
+    reportableFBTNoContrib: rfbtNo, reportableFBTWithContrib: rfbtWith
+  };
+}
+
+function buildOptRows(R) {
+  var rows = [];
+  var mx = Math.ceil(R.contribRequiredForZero / 12 / 250) * 250;
+  var step = Math.max(250, Math.round(mx / 10 / 250) * 250);
+  var fz = false;
+  for (var m = 0; m <= mx + step; m += step) {
+    var a = m * 12 + state.tpExp;
+    var tv = Math.max(0, R.taxableBeforeContrib - a);
+    var f = R.evExempt ? 0 : tv * R.grossUpRate * FBT_RATE;
+    var sv = R.fbtNoContrib - f;
+    var vtb = (R.depreciation + state.running + state.interest + f) * R.companyTaxRate;
+    var nc = a + f - vtb;
+    var zp = f === 0 && !fz;
+    if (f === 0) fz = true;
+    rows.push({ m: m, annual: a, tv: tv, fbt: f, saved: sv, vehicleTaxBenefit: vtb, netCost: nc, isZeroPoint: zp });
+  }
+  return rows;
+}
+
+/* ═══════════════ RESULT CARD HELPER ═══════════════ */
+function resultCard(title, value, subtitle, color, large) {
+  var bg = color + "10", bd = color + "30";
+  return '<div class="result-card' + (large ? ' large' : '') + '" style="background:' + bg + ';border-color:' + bd + ';">' +
+    '<div class="rc-title" style="color:' + color + ';">' + title + '<\/div>' +
+    '<div class="rc-value">' + value + '<\/div>' +
+    (subtitle ? '<div class="rc-sub">' + subtitle + '<\/div>' : '') +
+    '<\/div>';
+}
+function crow(label, a, b, better) {
+  return '<div class="crow"><div class="lbl">' + label + '<\/div>' +
+    '<div class="val">' + a + '<\/div>' +
+    '<div class="val' + (better ? ' better' : '') + '">' + b + '<\/div><\/div>';
+}
+
+/* ═══════════════ PANEL RENDERERS ═══════════════ */
+function renderCalc(R) {
+  var s = state;
+  var html = '<div class="card">';
+
+  if (s.method === "statutory") {
+    html += '<div class="section"><div class="section-title" style="color:var(--amber);border-color:rgba(214,158,46,0.25);">Statutory Method Calculation<\/div>';
+    html += '<div class="calc-box amber" style="border-color:#fefcbf;">';
+    html += '<div>Base Value = ' + (s.carAge >= 4 ? '(' + fmt(s.carValue) + ' - ' + fmt(s.upfront) + ') x 2/3' : fmt(s.carValue) + ' - ' + fmt(s.upfront)) + ' = <strong>' + fmt(R.baseValue) + '<\/strong><\/div>';
+    html += '<div>Taxable Value = ' + fmt(R.baseValue) + ' x 20% x ' + R.statDaysPrivate + '/' + DAYS_IN_YEAR + (s.daysAtPremises > 0 ? ' (' + s.days + '−' + s.daysAtPremises + ' days)' : '') + ' = <strong>' + fmtDec(R.statutoryTaxableValue) + '<\/strong><\/div>';
+    html += '<div>Less Contributions = <strong>' + fmtDec(R.annualContrib) + '<\/strong><\/div>';
+    html += '<div>Net Taxable Value = <strong>' + fmtDec(R.taxableValueAfterContrib) + '<\/strong><\/div>';
+    html += '<div class="divider" style="border-color:var(--amber);">Grossed-Up = ' + fmtDec(R.taxableValueAfterContrib) + ' x ' + R.grossUpRate + ' = <strong>' + fmtDec(R.taxableValueAfterContrib * R.grossUpRate) + '<\/strong><\/div>';
+    html += '<div>FBT = ' + fmtDec(R.taxableValueAfterContrib * R.grossUpRate) + ' x 47% = <strong style="color:var(--red);">' + fmtDec(R.fbtWithContrib) + '<\/strong><\/div>';
+    html += '<\/div>';
+    html += '<div class="grid-3">';
+    html += resultCard("FBT Without Contributions", fmt(R.fbtNoContrib), "Company would owe", "#C0392B", false);
+    html += resultCard("FBT With Contributions", fmt(R.fbtWithContrib), "Company now owes", R.fbtWithContrib === 0 ? "#38a169" : "#d69e2e", true);
+    html += resultCard("FBT Saved", fmt(R.fbtSaved), "Annual saving", "#38a169", false);
+    html += '<\/div><\/div>';
+  } else {
+    html += '<div class="section"><div class="section-title" style="color:var(--teal);border-color:rgba(20,169,185,0.25);">Operating Cost (Logbook) Method<\/div>';
+    html += '<div class="calc-box teal">';
+    html += '<div>Actual Running Costs = <strong>' + fmtDec(s.running) + '<\/strong><\/div>';
+    html += '<div>+ Deemed Depreciation = ' + fmt(R.openingWDV) + ' x 25%' + (s.carAge > 0 ? ' (yr ' + s.carAge + ' WDV)' : '') + ' = <strong>' + fmtDec(R.deemedDep) + '<\/strong><\/div>';
+    html += '<div>+ Deemed Interest = ' + fmt(R.openingWDV) + ' x ' + pct(FBT_BENCHMARK_INTEREST) + ' = <strong>' + fmtDec(R.deemedInt) + '<\/strong><\/div>';
+    html += '<div style="margin-top:4px;">Total Operating Costs = <strong>' + fmtDec(R.totalOpCosts) + '<\/strong><\/div>';
+    html += '<div class="divider" style="border-color:var(--teal);">Taxable Value = ' + fmtDec(R.totalOpCosts) + ' x ' + Math.round(R.privFrac * 100) + '% private = <strong>' + fmtDec(R.ocTaxableValue) + '<\/strong><\/div>';
+    html += '<div>Less Contributions = <strong>' + fmtDec(R.annualContrib) + '<\/strong><\/div>';
+    html += '<div>Net Taxable Value = <strong>' + fmtDec(R.taxableValueAfterContrib) + '<\/strong><\/div>';
+    html += '<div class="divider" style="border-color:var(--teal);">Grossed-Up = ' + fmtDec(R.taxableValueAfterContrib) + ' x ' + R.grossUpRate + ' = <strong>' + fmtDec(R.taxableValueAfterContrib * R.grossUpRate) + '<\/strong><\/div>';
+    html += '<div>FBT = ' + fmtDec(R.taxableValueAfterContrib * R.grossUpRate) + ' x 47% = <strong style="color:var(--red);">' + fmtDec(R.fbtWithContrib) + '<\/strong><\/div>';
+    html += '<div style="margin-top:6px;font-size:11px;color:var(--grey);">Note: deemed dep/interest use the full cost — the car limit does NOT apply to the FBT operating cost base.<\/div>';
+    html += '<\/div>';
+    html += '<div class="grid-3">';
+    html += resultCard("FBT Without Contributions", fmt(R.fbtNoContrib), "Company would owe", "#C0392B", false);
+    html += resultCard("FBT With Contributions", fmt(R.fbtWithContrib), "Company now owes", R.fbtWithContrib === 0 ? "#38a169" : "#d69e2e", true);
+    html += resultCard("FBT Saved", fmt(R.fbtSaved), "Annual saving", "#38a169", false);
+    html += '<\/div><\/div>';
+  }
+
+  // Method comparison
+  html += '<div class="section"><div class="section-title" style="color:var(--grey);border-color:rgba(113,128,150,0.25);">Method Comparison (before contributions)<\/div>';
+  html += '<div class="grid-2">';
+  html += '<div style="padding:12px;border-radius:9px;border:2px solid ' + (R.statFbt <= R.ocFbt ? '#38a169' : '#e2e8f0') + ';background:' + (R.statFbt <= R.ocFbt ? '#f0fff4' : '#fff') + ';">' +
+    '<div style="font-size:10.5px;font-weight:700;color:var(--grey);text-transform:uppercase;margin-bottom:3px;">Statutory ' + (R.statFbt <= R.ocFbt ? '✓ lower' : '') + '<\/div>' +
+    '<div style="font-size:20px;font-weight:800;font-family:monospace;color:var(--ink);">' + fmt(R.statFbt) + '<\/div>' +
+    '<div style="font-size:10.5px;color:var(--light-grey);">FBT before contributions<\/div><\/div>';
+  html += '<div style="padding:12px;border-radius:9px;border:2px solid ' + (R.ocFbt < R.statFbt ? '#38a169' : '#e2e8f0') + ';background:' + (R.ocFbt < R.statFbt ? '#f0fff4' : '#fff') + ';">' +
+    '<div style="font-size:10.5px;font-weight:700;color:var(--grey);text-transform:uppercase;margin-bottom:3px;">Operating Cost ' + (R.ocFbt < R.statFbt ? '✓ lower' : '') + '<\/div>' +
+    '<div style="font-size:20px;font-weight:800;font-family:monospace;color:var(--ink);">' + fmt(R.ocFbt) + '<\/div>' +
+    '<div style="font-size:10.5px;color:var(--light-grey);">at ' + s.bizUse + '% business use<\/div><\/div>';
+  html += '<\/div>';
+  html += '<p style="font-size:11px;color:var(--light-grey);margin-top:8px;">Employers elect the method per car each FBT year and may choose whichever gives the lower taxable value. Operating cost typically wins once business use is above ~40–50%.<\/p>';
+  html += '<\/div>';
+
+  // To reduce to zero
+  html += '<div class="section"><div class="section-title" style="color:var(--slate);border-color:rgba(14,127,139,0.25);">To Reduce FBT to Zero<\/div>';
+  html += '<div class="grid-2">';
+  html += resultCard("Annual Contribution Needed", fmtDec(R.contribRequiredForZero), "", "#0E7F8B", false);
+  html += resultCard("Monthly Required", fmtDec(R.monthlyRequiredForZero), "From after-tax salary", "#0E7F8B", true);
+  html += '<\/div><\/div>';
+
+  html += '<\/div>';
+  return html;
+}
+
+function renderVehicle(R) {
+  var s = state;
+  var html = '<div class="card"><div class="section"><div class="section-title" style="color:var(--slate);border-color:rgba(14,127,139,0.25);">Vehicle Expense — Company Tax Benefit<\/div>';
+  html += '<div class="calc-box teal" style="line-height:2;">';
+  html += '<div>Actual Cost = ' + fmt(s.carValue) + ' - ' + fmt(s.upfront) + ' = <strong>' + fmt(R.actualCost) + '<\/strong><\/div>';
+  if (s.gstCred) html += '<div>Less GST (1/11) = <strong>' + fmt(R.actualCost * GST_FRACTION) + '<\/strong><\/div>';
+  html += '<div>Cost ex-GST = <strong>' + fmt(R.costExGST) + '<\/strong><\/div>';
+  html += '<div>ATO Limit ex-GST = <strong>' + fmt(R.atoLimitExGST) + '<\/strong><\/div>';
+  html += '<div style="color:' + (R.isCapped ? 'var(--red)' : 'var(--purple)') + ';">Depreciable Base = <strong>' + fmt(R.depreciableBaseCapped) + '<\/strong>' + (R.isCapped ? '<span style="background:#fed7d7;padding:1px 6px;border-radius:4px;font-size:10.5px;margin-left:8px;font-weight:700;">CAPPED<\/span>' : '') + '<\/div>';
+  html += '<div class="divider" style="border-color:var(--slate);">Dep (Yr 1) = ' + fmt(R.depreciableBaseCapped) + ' x ' + pct(DEP_RATES[s.depM]) + ' = <strong>' + fmtDec(R.depreciation) + '<\/strong><\/div>';
+  html += '<div>Running = <strong>' + fmtDec(s.running) + '<\/strong> | Interest = <strong>' + fmtDec(s.interest) + '<\/strong> | FBT = <strong>' + fmtDec(R.fbtWithContrib) + '<\/strong><\/div>';
+  html += '<div class="divider" style="border-color:var(--slate);">Total Deductible = <strong>' + fmtDec(R.totalDeductible) + '<\/strong><\/div>';
+  html += '<div>Tax Benefit = ' + fmtDec(R.totalDeductible) + ' x ' + pct(R.companyTaxRate) + ' = <strong style="color:var(--green);">' + fmtDec(R.companyTaxBenefit) + '<\/strong><\/div>';
+  html += '<\/div>';
+  html += '<div class="grid-3" style="margin-bottom:16px;">';
+  html += resultCard("Total Deductible", fmt(R.totalDeductible), "", "#0E7F8B", false);
+  html += resultCard("Company Tax Saving", fmt(R.companyTaxBenefit), "@ " + pct(R.companyTaxRate), "#38a169", true);
+  html += resultCard("GST Credit (capped)", fmt(R.gstCreditOnPurchase), "Max 1/11 x " + fmt(ATO_CAR_LIMIT), "#14A9B9", false);
+  html += '<\/div>';
+  html += '<div class="grid-2" style="margin-bottom:14px;gap:10px;">';
+  html += '<div style="padding:10px;background:#fff;border-radius:7px;border:1px solid var(--teal-light);">' +
+    '<div style="font-size:10px;font-weight:700;color:var(--grey);margin-bottom:2px;">WITHOUT CONTRIBUTIONS<\/div>' +
+    '<div style="font-size:12px;color:var(--muted);line-height:1.6;">FBT: ' + fmtDec(R.fbtNoContrib) + '<br>Deductions: ' + fmtDec(R.totalDeductibleNoContrib) + '<br>Tax benefit: <strong>' + fmtDec(R.companyTaxBenefitNoContrib) + '<\/strong><\/div><\/div>';
+  html += '<div style="padding:10px;background:#f0fff4;border-radius:7px;border:1px solid #c6f6d5;">' +
+    '<div style="font-size:10px;font-weight:700;color:var(--green);margin-bottom:2px;">WITH CONTRIBUTIONS<\/div>' +
+    '<div style="font-size:12px;color:var(--muted);line-height:1.6;">FBT: ' + fmtDec(R.fbtWithContrib) + '<br>Deductions: ' + fmtDec(R.totalDeductible) + '<br>Tax benefit: <strong>' + fmtDec(R.companyTaxBenefit) + '<\/strong><\/div><\/div>';
+  html += '<\/div>';
+  html += '<div style="background:#fffff0;border:1px solid #fefcbf;border-radius:9px;padding:14px;">' +
+    '<div style="font-size:12px;font-weight:700;color:var(--amber);margin-bottom:6px;">Net Position<\/div>' +
+    '<div style="font-size:12.5px;color:#744210;line-height:1.8;">FBT saved: <strong>' + fmtDec(R.fbtSaved) + '<\/strong> | Lost deduction: <strong>' + fmtDec((R.fbtNoContrib - R.fbtWithContrib) * R.companyTaxRate) + '<\/strong> | Net benefit: <strong style="color:var(--green);">' + fmtDec(R.fbtSaved - (R.fbtNoContrib - R.fbtWithContrib) * R.companyTaxRate) + '<\/strong><\/div><\/div>';
+  html += '<\/div><\/div>';
+  return html;
+}
+
+function renderCompare(R) {
+  var html = '<div class="card"><div class="section"><div class="section-title" style="color:var(--amber);border-color:rgba(214,158,46,0.25);">Pay FBT vs Contributions<\/div>';
+  html += '<div style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:8px;padding:8px 0;border-bottom:2px solid var(--teal);margin-bottom:3px;"><div><\/div>' +
+    '<div style="font-size:11px;font-weight:800;color:var(--red);text-align:right;">A: PAY FBT<\/div>' +
+    '<div style="font-size:11px;font-weight:800;color:var(--green);text-align:right;">B: CONTRIBUTE<\/div><\/div>';
+  html += crow("FBT Payable", fmt(R.fbtNoContrib), fmt(R.fbtWithContrib), true);
+  html += crow("Employee After-Tax Cost", fmt(0), fmt(R.afterTaxCostOfContrib), false);
+  html += crow("Pre-Tax Salary Equiv.", fmt(0), fmt(R.preTaxEquivalent), false);
+  html += crow("Company FBT Saving", fmt(0), fmt(R.fbtSaved), true);
+  html += crow("Vehicle Deductions", fmt(R.totalDeductibleNoContrib), fmt(R.totalDeductible), false);
+  html += crow("Company Tax Benefit", fmt(R.companyTaxBenefitNoContrib), fmt(R.companyTaxBenefit), false);
+  html += crow("Net Company Benefit", fmt(0), fmtDec(R.fbtSaved - (R.fbtNoContrib - R.fbtWithContrib) * R.companyTaxRate), true);
+  html += crow("Reportable FBT", fmt(R.reportableFBTNoContrib), fmt(R.reportableFBTWithContrib), true);
+  html += crow("GST on Contributions", fmt(0), fmt(R.gstOnContrib), false);
+  var below = R.marginalRate < FBT_RATE;
+  html += '<div style="margin-top:14px;padding:14px;background:' + (below ? '#f0fff4' : '#fffff0') + ';border:1px solid ' + (below ? '#c6f6d5' : '#fefcbf') + ';border-radius:9px;">' +
+    '<div style="font-size:12px;font-weight:700;color:' + (below ? 'var(--green-dark)' : '#744210') + ';margin-bottom:6px;">Key Insight<\/div>' +
+    '<div style="font-size:12.5px;color:' + (below ? '#2f855a' : '#744210') + ';line-height:1.7;">' +
+    (below ? 'Marginal rate (' + pct(R.marginalRate) + ') &lt; FBT (47%). Contributions save ' + fmtDec(R.fbtSaved) + '. Net benefit: ' + fmtDec(R.fbtSaved - (R.fbtNoContrib - R.fbtWithContrib) * R.companyTaxRate) + '.'
+      : 'Marginal rate (' + pct(R.marginalRate) + ') &gt;= FBT. Consider reportable FBT benefits (HECS, child support, MLS).') +
+    '<\/div><\/div>';
+  html += '<\/div><\/div>';
+  return html;
+}
+
+function renderStructure(R) {
+  var s = state;
+  var bizBetter = R.businessBetterBy >= 0;
+  var html = '<div class="card"><div class="section"><div class="section-title" style="color:var(--purple);border-color:rgba(21,58,124,0.25);">Should the car be held in the business or personal name?<\/div>';
+  html += '<p style="font-size:12px;color:var(--grey);margin-bottom:14px;line-height:1.6;">Annual after-tax cost comparison for an owner who is an employee/director. The business scenario uses the <strong>' + (R.method === "operating" ? "operating cost" : "statutory") + '<\/strong> FBT method (no employee contributions). The personal scenario assumes the owner buys the car themselves and claims work-related expenses at ' + s.bizUse + '% via logbook (no GST credit).<\/p>';
+
+  html += '<div class="grid-2" style="gap:12px;margin-bottom:16px;">';
+  // Business
+  html += '<div style="padding:14px;border-radius:10px;border:2px solid ' + (bizBetter ? '#38a169' : '#e2e8f0') + ';background:' + (bizBetter ? '#f0fff4' : '#fff') + ';">' +
+    '<div style="font-size:12px;font-weight:800;color:var(--teal);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">In the Business ' + (bizBetter ? '✓' : '') + '<\/div>' +
+    '<div style="font-size:11.5px;color:var(--muted);line-height:1.9;font-family:monospace;">' +
+    'Running + Interest: ' + fmt(s.running + s.interest) + '<br>' +
+    '+ FBT (' + (R.method === "operating" ? "op. cost" : "statutory") + '): <span style="color:var(--red);">' + fmt(R.fbtCompare) + '<\/span><br>' +
+    '− Tax deductions @ ' + pct(R.companyTaxRate) + ': <span style="color:var(--green);">' + fmt(R.bizTaxShield) + '<\/span><br>' +
+    '<span style="font-size:10.5px;color:var(--light-grey);">(deducts running, interest, dep ' + fmt(R.depreciation) + ' &amp; FBT)<\/span><\/div>' +
+    '<div style="margin-top:10px;padding-top:10px;border-top:1px solid #c6f6d5;">' +
+    '<div style="font-size:10px;font-weight:700;color:var(--grey);text-transform:uppercase;">Net Annual Cost<\/div>' +
+    '<div style="font-size:24px;font-weight:800;font-family:monospace;color:var(--ink);">' + fmt(R.netBusinessAnnual) + '<\/div><\/div><\/div>';
+  // Personal
+  html += '<div style="padding:14px;border-radius:10px;border:2px solid ' + (!bizBetter ? '#38a169' : '#e2e8f0') + ';background:' + (!bizBetter ? '#f0fff4' : '#fff') + ';">' +
+    '<div style="font-size:12px;font-weight:800;color:var(--slate);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">In Personal Name ' + (!bizBetter ? '✓' : '') + '<\/div>' +
+    '<div style="font-size:11.5px;color:var(--muted);line-height:1.9;font-family:monospace;">' +
+    'Running + Interest: ' + fmt(s.running + s.interest) + '<br>' +
+    '+ FBT: <span style="color:var(--green);">' + fmt(0) + '<\/span> (none)<br>' +
+    '− Work-use deduction @ ' + pct(R.marginalRate) + ': <span style="color:var(--green);">' + fmt(R.personalDeduction) + '<\/span><br>' +
+    '<span style="font-size:10.5px;color:var(--light-grey);">(' + s.bizUse + '% × running, interest &amp; dep ' + fmt(R.personalDep) + ')<\/span><\/div>' +
+    '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--teal-light);">' +
+    '<div style="font-size:10px;font-weight:700;color:var(--grey);text-transform:uppercase;">Net Annual Cost<\/div>' +
+    '<div style="font-size:24px;font-weight:800;font-family:monospace;color:var(--ink);">' + fmt(R.netPersonalAnnual) + '<\/div><\/div><\/div>';
+  html += '<\/div>';
+
+  // Verdict
+  html += '<div style="background:' + (bizBetter ? 'linear-gradient(135deg,#153A7C,#2C3E73)' : 'linear-gradient(135deg,#0E7F8B,#14A9B9)') + ';border-radius:11px;padding:16px 18px;color:#fff;text-align:center;">' +
+    '<div style="font-size:11px;font-weight:700;opacity:0.85;text-transform:uppercase;letter-spacing:0.08em;">On these numbers<\/div>' +
+    '<div style="font-size:18px;font-weight:800;margin:4px 0;">' +
+    (Math.abs(R.businessBetterBy) < 1 ? "Roughly line-ball" : bizBetter ? "Holding in the business is cheaper" : "Holding personally is cheaper") + '<\/div>' +
+    '<div style="font-size:13px;opacity:0.95;">by <strong>' + fmt(Math.abs(R.businessBetterBy)) + '<\/strong> per year' + (R.evExempt ? " — and the EV FBT exemption strongly favours the business" : "") + '<\/div><\/div>';
+
+  // Caveats
+  html += '<div style="margin-top:14px;background:#fffff0;border:1px solid #fefcbf;border-radius:9px;padding:14px;">' +
+    '<div style="font-size:12px;font-weight:700;color:var(--amber-text);margin-bottom:6px;">Before you advise — adjustments not in the annual figure<\/div>' +
+    '<div style="font-size:11.5px;color:#744210;line-height:1.75;">' +
+    '• <strong>One-off GST credit on purchase<\/strong> (business only): up to ' + fmt(R.gstCreditOnPurchase) + ' — a real cash advantage to holding in the business.<br>' +
+    '• <strong>GST on running costs<\/strong> (business only): a further ~' + fmt(s.gstCred ? s.running * GST_FRACTION : 0) + '/yr of input credits not modelled above.<br>' +
+    '• <strong>Reportable Fringe Benefits Amount<\/strong>: the business scenario creates an RFBA for the director' + (R.evExempt ? " (EVs included even though exempt)" : "") + ', which can affect Div 293, HECS/HELP, Medicare levy surcharge and child support — a non-cash cost.<br>' +
+    '• Assumes the company has taxable income to absorb the deductions, and a valid logbook supports the ' + s.bizUse + '% work use. Home-to-work travel is private.<br>' +
+    '• Excludes stamp duty, the capital outlay (same in both), and any salary-sacrifice arrangement.<\/div><\/div>';
+  html += '<p style="font-size:10.5px;color:var(--light-grey);margin-top:8px;">Indicative structural comparison only — not advice. Confirm against the client\'s actual figures before relying on it.<\/p>';
+  html += '<\/div><\/div>';
+  return html;
+}
+
+function renderOptimize(R, optRows) {
+  var s = state;
+  var html = '<div class="card"><div class="section"><div class="section-title" style="color:var(--slate);border-color:rgba(14,127,139,0.25);">Contribution Optimizer<\/div>';
+  html += '<p style="font-size:12px;color:var(--grey);margin-bottom:14px;">Depreciation capped at ATO limit (' + fmt(R.depreciableBaseCapped) + ' ex-GST).<\/p>';
+  html += '<div style="overflow-x:auto;"><table class="opt"><thead><tr>';
+  ["Monthly", "Annual", "Taxable Value", "FBT Payable", "Saved", "Vehicle Tax Benefit", "Net Cost*"].forEach(function (h) { html += '<th>' + h + '<\/th>'; });
+  html += '<\/tr><\/thead><tbody>';
+  var stepSize = optRows.length > 1 ? Math.abs(optRows[1].m - optRows[0].m) / 2 : 250;
+  optRows.forEach(function (r, i) {
+    var cur = Math.abs(r.m - s.aContrib / 12) < stepSize;
+    var bg = cur ? "#D6F1F4" : r.isZeroPoint ? "#f0fff4" : (i % 2 ? "#fafafa" : "#fff");
+    var bl = cur ? "3px solid #2C3E73" : r.isZeroPoint ? "3px solid #38a169" : "3px solid transparent";
+    html += '<tr style="background:' + bg + ';border-left:' + bl + ';">';
+    html += '<td style="font-weight:' + (cur || r.isZeroPoint ? 700 : 400) + ';">' + fmt(r.m) + (cur ? ' ◄' : '') + '<\/td>';
+    html += '<td>' + fmt(r.annual) + '<\/td>';
+    html += '<td>' + fmt(r.tv) + '<\/td>';
+    html += '<td style="color:' + (r.fbt === 0 ? 'var(--green)' : 'var(--red)') + ';font-weight:' + (r.fbt === 0 ? 700 : 400) + ';">' + fmt(r.fbt) + '<\/td>';
+    html += '<td style="color:var(--green);">' + fmt(r.saved) + '<\/td>';
+    html += '<td style="color:var(--slate);">' + fmt(r.vehicleTaxBenefit) + '<\/td>';
+    html += '<td style="font-weight:600;">' + fmt(r.netCost) + '<\/td>';
+    html += '<\/tr>';
+  });
+  html += '<\/tbody><\/table><\/div>';
+  html += '<div style="font-size:10.5px;color:var(--light-grey);margin-top:6px;">* Net Cost = Contrib + FBT - vehicle tax benefit. Blue = current. Green = zero FBT.<\/div>';
+  html += '<\/div>';
+
+  // Quick ref
+  html += '<div class="section"><div class="section-title" style="color:var(--grey);border-color:rgba(113,128,150,0.25);">Quick Reference<\/div><div class="grid-2" style="gap:10px;">';
+  html += '<div style="padding:12px;background:var(--bg);border-radius:9px;border:1px solid #e2e8f0;">' +
+    '<div style="font-size:10.5px;font-weight:700;color:var(--grey);margin-bottom:5px;text-transform:uppercase;">FBT Year 2025-26<\/div>' +
+    '<div style="font-size:12.5px;color:var(--muted);line-height:1.8;">FBT Rate: <strong>47%<\/strong><br>Statutory: <strong>20%<\/strong><br>Type 1: <strong>2.0802<\/strong><br>Type 2: <strong>1.8868<\/strong><\/div><\/div>';
+  html += '<div style="padding:12px;background:var(--bg);border-radius:9px;border:1px solid #e2e8f0;">' +
+    '<div style="font-size:10.5px;font-weight:700;color:var(--grey);margin-bottom:5px;text-transform:uppercase;">Key Limits<\/div>' +
+    '<div style="font-size:12.5px;color:var(--muted);line-height:1.8;">Car Dep Limit: <strong>' + fmt(ATO_CAR_LIMIT) + '<\/strong><br>Max GST Credit: <strong>' + fmt(Math.round(ATO_CAR_LIMIT / 11)) + '<\/strong><br>EV Exempt: <strong>≤ $91,387<\/strong><br>After-tax contributions only<\/div><\/div>';
+  html += '<\/div><\/div><\/div>';
+  return html;
+}
+
+/* ═══════════════ MAIN RENDER ═══════════════ */
+var TABS = [
+  { id: "calc", l: "Calculator" },
+  { id: "vehicle", l: "Vehicle Costs" },
+  { id: "compare", l: "Comparison" },
+  { id: "structure", l: "Business vs Personal" },
+  { id: "optimize", l: "Optimizer" }
+];
+
+function render() {
+  var R = compute();
+  var optRows = buildOptRows(R);
+  var s = state;
+
+  // Header sub
+  document.getElementById("headerSub").textContent =
+    "FBT year ending 31 March 2026 · Rate 47% · " +
+    (s.method === "operating" ? "Operating cost · " + s.bizUse + "% business" : "Statutory formula");
+
+  // Inputs sync
+  setVal("carValue", s.carValue); setVal("upfront", s.upfront); setVal("days", s.days);
+  setVal("daysAtPremises", s.daysAtPremises); setVal("carAge", s.carAge); setVal("aContrib", s.aContrib);
+  setVal("tpExp", s.tpExp); setVal("salary", s.salary); setVal("running", s.running); setVal("interest", s.interest);
+  setVal("bizUseRange", s.bizUse); setVal("bizUseNum", s.bizUse);
+
+  // Toggles
+  setToggle("isEV", s.isEV); setToggle("gstCred", s.gstCred); setToggle("isBRE", s.isBRE);
+
+  // Method selector
+  var methodOpts = [
+    { v: "statutory", l: "Statutory Formula", d: "Flat 20% of base value. No logbook needed." },
+    { v: "operating", l: "Operating Cost (Logbook)", d: "Private-use % of running costs. Needs a logbook." }
+  ];
+  document.getElementById("methodSelector").innerHTML = methodOpts.map(function (o) {
+    return '<button class="method-card' + (s.method === o.v ? ' sel' : '') + '" data-method="' + o.v + '">' +
+      '<div class="mc-title">' + (s.method === o.v ? '● ' : '○ ') + o.l + '<\/div>' +
+      '<div class="mc-desc">' + o.d + '<\/div><\/button>';
+  }).join("");
+
+  // Dep method segment
+  var depOpts = [{ v: "diminishing", l: "Diminishing (25%)" }, { v: "prime", l: "Prime Cost (12.5%)" }];
+  document.getElementById("depMethodSeg").innerHTML = depOpts.map(function (o) {
+    return '<button class="seg-btn' + (s.depM === o.v ? ' sel' : '') + '" data-dep="' + o.v + '">' + o.l + '<\/button>';
+  }).join("");
+
+  // Business use labels
+  document.getElementById("privUseLabel").textContent = Math.round(100 - s.bizUse);
+  document.getElementById("bizUseHelp").textContent = s.method === "operating"
+    ? "Under operating cost, FBT is charged on the " + Math.round(100 - s.bizUse) + "% private portion of total running costs (incl. deemed depreciation at 25% and deemed interest at " + pct(FBT_BENCHMARK_INTEREST) + ")."
+    : "Statutory FBT ignores actual use, but this % is used in the Business vs Personal comparison. Note: home-to-work travel is private, so the work-related % is often lower than total business use.";
+
+  // Days section show/hide + values
+  document.getElementById("daysSection").className = "section" + (s.method === "statutory" ? "" : " hidden");
+  document.getElementById("daysPrivateVal").textContent = R.statDaysPrivate;
+  document.getElementById("daysPrivateCalc").textContent = "= " + s.days + " − " + s.daysAtPremises;
+  document.getElementById("daysPrivateScale").textContent = R.statDaysPrivate;
+
+  // Contrib monthly
+  document.getElementById("contribMonthly").textContent = fmtDec(s.aContrib / 12);
+
+  // Banners
+  var capB = document.getElementById("capBanner");
+  capB.className = "banner cap" + (R.isCapped ? "" : " hidden");
+  document.getElementById("capBannerText").innerHTML = "Cost (" + fmt(R.actualCost) + ") exceeds ATO limit (" + fmt(ATO_CAR_LIMIT) + "). Depreciation capped at " + fmt(R.depreciableBaseCapped) + " ex-GST. GST credit capped at " + fmt(R.gstCreditOnPurchase) + ".";
+  document.getElementById("evBanner").className = "banner ev" + (R.evExempt ? "" : " hidden");
+
+  // Panels
+  document.getElementById("panel-calc").innerHTML = renderCalc(R);
+  document.getElementById("panel-vehicle").innerHTML = renderVehicle(R);
+  document.getElementById("panel-compare").innerHTML = renderCompare(R);
+  document.getElementById("panel-structure").innerHTML = renderStructure(R);
+  document.getElementById("panel-optimize").innerHTML = renderOptimize(R, optRows);
+
+  // Tab visibility
+  TABS.forEach(function (t) {
+    document.getElementById("panel-" + t.id).className = (t.id === s.tab ? "" : "hidden");
+  });
+
+  // Re-bind dynamic buttons
+  bindDynamic();
+
+  // Stash for PDF
+  window.__R = R; window.__optRows = optRows;
+}
+
+function setVal(id, v) { var el = document.getElementById(id); if (el && el.value != v) el.value = v; }
+function setToggle(key, on) {
+  var head = document.querySelector('[data-toggle="' + key + '"]');
+  if (head) head.querySelector(".toggle-track").className = "toggle-track" + (on ? " on" : "");
+}
+
+/* ═══════════════ TABS ═══════════════ */
+function buildTabs() {
+  var html = TABS.map(function (t) {
+    return '<button class="tab-btn' + (state.tab === t.id ? ' active' : '') + '" data-tab="' + t.id + '">' + t.l + '<\/button>';
+  }).join("");
+  document.getElementById("tabs").innerHTML = html;
+  Array.prototype.forEach.call(document.querySelectorAll("[data-tab]"), function (b) {
+    b.onclick = function () { state.tab = b.getAttribute("data-tab"); buildTabs(); render(); };
+  });
+}
+
+function bindDynamic() {
+  Array.prototype.forEach.call(document.querySelectorAll("[data-method]"), function (b) {
+    b.onclick = function () { state.method = b.getAttribute("data-method"); render(); };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-dep]"), function (b) {
+    b.onclick = function () { state.depM = b.getAttribute("data-dep"); render(); };
+  });
+}
+
+/* ═══════════════ INPUT BINDINGS ═══════════════ */
+function bindInputs() {
+  var numMap = {
+    carValue: "carValue", upfront: "upfront", days: "days", daysAtPremises: "daysAtPremises",
+    carAge: "carAge", aContrib: "aContrib", tpExp: "tpExp", salary: "salary",
+    running: "running", interest: "interest"
+  };
+  Object.keys(numMap).forEach(function (id) {
+    var el = document.getElementById(id);
+    el.addEventListener("input", function () { state[numMap[id]] = Number(el.value) || 0; render(); });
+  });
+
+  // Business use range + number
+  var range = document.getElementById("bizUseRange");
+  var num = document.getElementById("bizUseNum");
+  range.addEventListener("input", function () { state.bizUse = Number(range.value); render(); });
+  num.addEventListener("input", function () { state.bizUse = Math.max(0, Math.min(100, Number(num.value) || 0)); render(); });
+
+  // Toggles
+  Array.prototype.forEach.call(document.querySelectorAll("[data-toggle]"), function (head) {
+    head.onclick = function () {
+      var key = head.getAttribute("data-toggle");
+      state[key] = !state[key];
+      render();
+    };
+  });
+}
+
+/* ═══════════════ PDF EXPORT ═══════════════ */
+function generatePDF(inputs, results, optRows) {
+  var now = new Date().toLocaleDateString("en-AU", { day: "numeric", month: "long", year: "numeric" });
+  var dc = results.isCapped;
+  var insight = results.marginalRate < FBT_RATE
+    ? "Employee marginal rate (" + pct(results.marginalRate) + ") is below the FBT rate (47%). Employee contributions are more tax-efficient than the employer paying FBT."
+    : "Employee marginal rate (" + pct(results.marginalRate) + ") is at or above FBT rate. Consider the reportable FBT impact on income-tested benefits (HECS, child support, MLS).";
+
+  var optRowsHtml = optRows.map(function (r) {
+    var cls = r.isZeroPoint ? "highlight-row" : "";
+    var fbtStyle = r.fbt === 0 ? "green bold" : "red";
+    return '<tr class="' + cls + '">' +
+      '<td class="r">' + fmt(r.m) + '<\/td><td class="r">' + fmt(r.annual) + '<\/td><td class="r">' + fmt(r.tv) + '<\/td>' +
+      '<td class="r ' + fbtStyle + '">' + fmt(r.fbt) + '<\/td><td class="r green">' + fmt(r.saved) + '<\/td>' +
+      '<td class="r purple">' + fmt(r.vehicleTaxBenefit) + '<\/td><td class="r bold">' + fmt(r.netCost) + '<\/td><\/tr>';
+  }).join("");
+
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>FBT Car Benefit Analysis — Acebiz<\/title>' +
+'<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@700;800;900&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">' +
+'<style>' +
+'@page { size: A4; margin: 16mm 14mm 18mm 14mm; }' +
+'* { box-sizing: border-box; margin: 0; padding: 0; }' +
+'body { font-family: "IBM Plex Sans", -apple-system, Helvetica, Arial, sans-serif; font-size: 10px; color: #1F2933; line-height: 1.45; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }' +
+'.page { page-break-after: always; padding: 0; }' +
+'.page:last-child { page-break-after: auto; }' +
+'.header { background: linear-gradient(135deg, #0E1B3A, #172755, #2C3E73); color: #fff; padding: 16px 22px 14px; margin: -16mm -14mm 16px -14mm; width: calc(100% + 28mm); border-top: 4px solid #14A9B9; }' +
+'.header .wordmark { font-family: "Outfit", sans-serif; font-size: 17px; font-weight: 900; margin-bottom: 5px; }' +
+'.header .wordmark .biz { color: #14A9B9; }' +
+'.header .firm { font-size: 8px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #5FC7D2; margin-bottom: 4px; }' +
+'.header h1 { font-family: "Outfit", sans-serif; font-size: 18px; font-weight: 800; margin: 0 0 2px; }' +
+'.header .sub { font-size: 9.5px; opacity: 0.8; }' +
+'.section-title { font-family: "Outfit", sans-serif; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; padding-bottom: 5px; border-bottom: 2px solid; margin-bottom: 8px; margin-top: 16px; }' +
+'table { width: 100%; border-collapse: collapse; font-size: 9.5px; margin-bottom: 10px; }' +
+'th { background: #F8FAFC; font-weight: 700; text-align: left; padding: 5px 8px; border-bottom: 2px solid #e2e8f0; font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em; color: #4B5563; }' +
+'td { padding: 4px 8px; border-bottom: 1px solid #edf2f7; }' +
+'.r { text-align: right; font-family: "SF Mono", "Consolas", monospace; }' +
+'.bold { font-weight: 700; } .green { color: #276749; } .red { color: #C0392B; } .purple { color: #153A7C; } .blue { color: #14A9B9; } .amber { color: #975a16; }' +
+'.highlight-row { background: #f0fff4; } .capped-row { background: #fffff0; }' +
+'.result-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 10px 0; }' +
+'.result-box { border: 1.5px solid; border-radius: 8px; padding: 10px 12px; text-align: center; }' +
+'.result-box .label { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 3px; }' +
+'.result-box .value { font-size: 18px; font-weight: 800; font-family: "SF Mono", "Consolas", monospace; }' +
+'.result-box .sub { font-size: 8px; color: #718096; margin-top: 2px; }' +
+'.insight-box { border-radius: 8px; padding: 12px 14px; margin: 12px 0; }' +
+'.footer { text-align: center; font-size: 8px; color: #a0aec0; padding-top: 12px; border-top: 1px solid #edf2f7; margin-top: 16px; }' +
+'.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }' +
+'.ref-box { background: #F8FAFC; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; }' +
+'.ref-box .ref-title { font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #718096; margin-bottom: 4px; }' +
+'.ref-box .ref-body { font-size: 9.5px; line-height: 1.7; }' +
+'<\/style><\/head><body>' +
+
+// PAGE 1
+'<div class="page"><div class="header"><div class="wordmark">Ace<span class="biz">biz<\/span><\/div>' +
+'<div class="firm">C&amp;S Partners Australia Pty Ltd · Tax Agent<\/div>' +
+'<h1>FBT Car Benefit Analysis Report<\/h1>' +
+'<div class="sub">Generated: ' + now + ' &nbsp;|&nbsp; FBT Year ending 31 March 2026 &nbsp;|&nbsp; Rate: 47%<\/div><\/div>' +
+
+'<div class="section-title" style="color: #14A9B9; border-color: #14A9B940;">Vehicle &amp; Input Details<\/div>' +
+'<table><thead><tr><th>Input<\/th><th class="r">Value<\/th><\/tr><\/thead><tbody>' +
+'<tr><td>Car Purchase Price (inc. GST &amp; LCT)<\/td><td class="r bold">' + fmtDec(inputs.carValue) + '<\/td><\/tr>' +
+'<tr><td>Employee Upfront Payment<\/td><td class="r">' + fmtDec(inputs.upfrontPayment) + '<\/td><\/tr>' +
+'<tr><td>Days Car Held in Year<\/td><td class="r">' + inputs.daysAvailable + ' days<\/td><\/tr>' +
+'<tr><td>Days Kept at Business Premises (unavailable)<\/td><td class="r">' + inputs.daysAtPremises + ' days<\/td><\/tr>' +
+'<tr><td>Years Car Held<\/td><td class="r">' + inputs.carAge + ' years<\/td><\/tr>' +
+'<tr><td>Electric Vehicle<\/td><td class="r">' + (inputs.isEV ? "Yes" : "No") + '<\/td><\/tr>' +
+'<tr><td>GST Credit<\/td><td class="r">' + (inputs.gstCreditable ? "Type 1 (2.0802)" : "Type 2 (1.8868)") + '<\/td><\/tr>' +
+'<tr><td>Annual Post-Tax Contribution<\/td><td class="r">' + fmtDec(inputs.annualContrib) + ' <span style="color:#718096">(' + fmtDec(inputs.monthlyContrib) + '/mth)<\/span><\/td><\/tr>' +
+'<tr><td>Annual Third-Party Expenses<\/td><td class="r">' + fmtDec(inputs.thirdPartyExpenses) + '<\/td><\/tr>' +
+'<tr><td>Employee Annual Salary<\/td><td class="r">' + fmtDec(inputs.employeeSalary) + '<\/td><\/tr>' +
+'<tr><td>Annual Running Costs<\/td><td class="r">' + fmtDec(inputs.annualRunning) + '<\/td><\/tr>' +
+'<tr><td>Annual Loan Interest<\/td><td class="r">' + fmtDec(inputs.annualInterest) + '<\/td><\/tr>' +
+'<tr><td>Depreciation Method<\/td><td class="r">' + (inputs.depMethod === "prime" ? "Prime Cost (12.5%)" : "Diminishing Value (25%)") + '<\/td><\/tr>' +
+'<tr><td>Company Tax Rate<\/td><td class="r">' + (inputs.isBaseTier ? "25% (BRE)" : "30%") + '<\/td><\/tr>' +
+'<tr><td>ATO Car Depreciation Limit<\/td><td class="r">' + fmt(ATO_CAR_LIMIT) + '<\/td><\/tr>' +
+'<\/tbody><\/table>' +
+
+'<div class="section-title" style="color: #d69e2e; border-color: #d69e2e40;">Statutory Method Calculation<\/div>' +
+'<table><thead><tr><th>Step<\/th><th class="r">Amount<\/th><\/tr><\/thead><tbody>' +
+'<tr><td>Base Value' + (inputs.carAge >= 4 ? " (after 4yr reduction)" : "") + '<\/td><td class="r bold">' + fmtDec(results.baseValue) + '<\/td><\/tr>' +
+'<tr><td>Taxable Value (before contributions)<\/td><td class="r">' + fmtDec(results.statutoryTaxableValue) + '<\/td><\/tr>' +
+'<tr><td>Less: Employee Contributions<\/td><td class="r">' + fmtDec(results.annualContrib) + '<\/td><\/tr>' +
+'<tr><td>Net Taxable Value<\/td><td class="r bold">' + fmtDec(results.taxableValueAfterContrib) + '<\/td><\/tr>' +
+'<tr><td>Gross-Up Rate (' + (inputs.gstCreditable ? "Type 1" : "Type 2") + ')<\/td><td class="r">' + results.grossUpRate + '<\/td><\/tr>' +
+'<tr><td>Grossed-Up Amount<\/td><td class="r">' + fmtDec(results.taxableValueAfterContrib * results.grossUpRate) + '<\/td><\/tr>' +
+'<tr class="highlight-row"><td class="bold">FBT Payable (with contributions)<\/td><td class="r bold red">' + fmtDec(results.fbtWithContrib) + '<\/td><\/tr>' +
+'<\/tbody><\/table>' +
+
+'<div class="result-grid">' +
+'<div class="result-box" style="border-color: #fed7d7; background: #fff5f5;"><div class="label red">FBT Without Contributions<\/div><div class="value red">' + fmt(results.fbtNoContrib) + '<\/div><div class="sub">Company would owe<\/div><\/div>' +
+'<div class="result-box" style="border-color: ' + (results.fbtWithContrib === 0 ? "#c6f6d5" : "#fefcbf") + '; background: ' + (results.fbtWithContrib === 0 ? "#f0fff4" : "#fffff0") + ';"><div class="label" style="color: ' + (results.fbtWithContrib === 0 ? "#276749" : "#975a16") + ';">FBT With Contributions<\/div><div class="value" style="color: ' + (results.fbtWithContrib === 0 ? "#276749" : "#975a16") + ';">' + fmt(results.fbtWithContrib) + '<\/div><div class="sub">Company now owes<\/div><\/div>' +
+'<div class="result-box" style="border-color: #c6f6d5; background: #f0fff4;"><div class="label green">FBT Saved<\/div><div class="value green">' + fmt(results.fbtSaved) + '<\/div><div class="sub">Annual saving<\/div><\/div>' +
+'<\/div>' +
+
+'<div class="section-title" style="color: #0E7F8B; border-color: #0E7F8B40;">FBT Results Summary<\/div>' +
+'<table><thead><tr><th>Metric<\/th><th class="r">Amount<\/th><\/tr><\/thead><tbody>' +
+'<tr><td>Annual Contribution for Zero FBT<\/td><td class="r bold purple">' + fmtDec(results.contribRequiredForZero) + '<\/td><\/tr>' +
+'<tr><td>Monthly Contribution for Zero FBT<\/td><td class="r bold purple">' + fmtDec(results.monthlyRequiredForZero) + '<\/td><\/tr>' +
+'<tr><td>GST on Employee Contributions<\/td><td class="r">' + fmtDec(results.gstOnContrib) + '<\/td><\/tr>' +
+'<tr><td>Reportable FBT (no contributions)<\/td><td class="r">' + fmtDec(results.reportableFBTNoContrib) + '<\/td><\/tr>' +
+'<tr><td>Reportable FBT (with contributions)<\/td><td class="r">' + fmtDec(results.reportableFBTWithContrib) + '<\/td><\/tr>' +
+'<\/tbody><\/table>' +
+'<div class="footer">Illustrative only — not financial or tax advice. ATO rates for FBT year ending 31 March 2026. &copy; Acebiz — C&amp;S Partners Australia Pty Ltd<\/div><\/div>' +
+
+// PAGE 2
+'<div class="page"><div class="header"><div class="wordmark">Ace<span class="biz">biz<\/span><\/div>' +
+'<div class="firm">C&amp;S Partners Australia Pty Ltd · Tax Agent<\/div>' +
+'<h1>Vehicle Expenses &amp; Company Tax Benefit<\/h1>' +
+'<div class="sub">FBT Car Benefit Analysis — ' + now + '<\/div><\/div>' +
+
+'<div class="section-title" style="color: #0E7F8B; border-color: #0E7F8B40;">Depreciation (ATO Car Limit)<\/div>' +
+'<table><thead><tr><th>Item<\/th><th class="r">Amount<\/th><\/tr><\/thead><tbody>' +
+'<tr><td>Actual Cost (Purchase - Upfront)<\/td><td class="r">' + fmtDec(results.actualCost) + '<\/td><\/tr>' +
+'<tr><td>ATO Car Limit (2025-26)<\/td><td class="r">' + fmt(ATO_CAR_LIMIT) + '<\/td><\/tr>' +
+'<tr><td>Cost ex-GST<\/td><td class="r">' + fmtDec(results.costExGST) + '<\/td><\/tr>' +
+'<tr><td>ATO Limit ex-GST<\/td><td class="r">' + fmtDec(results.atoLimitExGST) + '<\/td><\/tr>' +
+'<tr class="' + (dc ? "capped-row" : "") + '"><td class="bold">Depreciable Amount' + (dc ? " (CAPPED)" : "") + '<\/td><td class="r bold ' + (dc ? "amber" : "") + '">' + fmtDec(results.depreciableBaseCapped) + '<\/td><\/tr>' +
+'<tr><td>Depreciation Method<\/td><td class="r">' + (inputs.depMethod === "prime" ? "Prime Cost 12.5%" : "Diminishing 25%") + '<\/td><\/tr>' +
+'<tr class="highlight-row"><td class="bold">Year 1 Depreciation<\/td><td class="r bold">' + fmtDec(results.depreciation) + '<\/td><\/tr>' +
+'<\/tbody><\/table>' +
+
+'<div class="section-title" style="color: #14A9B9; border-color: #14A9B940;">Deductible Expenses<\/div>' +
+'<table><thead><tr><th>Expense<\/th><th class="r">With Contributions<\/th><th class="r">Without Contributions<\/th><\/tr><\/thead><tbody>' +
+'<tr><td>Depreciation (ATO-capped)<\/td><td class="r">' + fmtDec(results.depreciation) + '<\/td><td class="r">' + fmtDec(results.depreciation) + '<\/td><\/tr>' +
+'<tr><td>Running Costs<\/td><td class="r">' + fmtDec(inputs.annualRunning) + '<\/td><td class="r">' + fmtDec(inputs.annualRunning) + '<\/td><\/tr>' +
+'<tr><td>Loan Interest<\/td><td class="r">' + fmtDec(inputs.annualInterest) + '<\/td><td class="r">' + fmtDec(inputs.annualInterest) + '<\/td><\/tr>' +
+'<tr><td>FBT Payable (deductible)<\/td><td class="r">' + fmtDec(results.fbtWithContrib) + '<\/td><td class="r">' + fmtDec(results.fbtNoContrib) + '<\/td><\/tr>' +
+'<tr class="highlight-row"><td class="bold">Total Deductible<\/td><td class="r bold">' + fmtDec(results.totalDeductible) + '<\/td><td class="r bold">' + fmtDec(results.totalDeductibleNoContrib) + '<\/td><\/tr>' +
+'<\/tbody><\/table>' +
+
+'<table><tbody>' +
+'<tr><td>Company Tax Rate<\/td><td class="r bold">' + pct(results.companyTaxRate) + '<\/td><\/tr>' +
+'<tr><td>Tax Benefit (with contributions)<\/td><td class="r bold green">' + fmtDec(results.companyTaxBenefit) + '<\/td><\/tr>' +
+'<tr><td>Tax Benefit (without contributions)<\/td><td class="r">' + fmtDec(results.companyTaxBenefitNoContrib) + '<\/td><\/tr>' +
+'<tr><td>GST Credit on Purchase (capped)<\/td><td class="r blue">' + fmtDec(results.gstCreditOnPurchase) + '<\/td><\/tr>' +
+'<\/tbody><\/table>' +
+
+'<div class="section-title" style="color: #d69e2e; border-color: #d69e2e40;">Net Position<\/div>' +
+'<table><tbody>' +
+'<tr><td>FBT Saved by Contributions<\/td><td class="r bold green">' + fmtDec(results.fbtSaved) + '<\/td><\/tr>' +
+'<tr><td>Lost Tax Deduction<\/td><td class="r red">' + fmtDec(rnd((results.fbtNoContrib - results.fbtWithContrib) * results.companyTaxRate)) + '<\/td><\/tr>' +
+'<tr class="highlight-row"><td class="bold">Net Company Benefit<\/td><td class="r bold green">' + fmtDec(rnd(results.fbtSaved - (results.fbtNoContrib - results.fbtWithContrib) * results.companyTaxRate)) + '<\/td><\/tr>' +
+'<\/tbody><\/table>' +
+
+'<div class="section-title" style="color: #C0392B; border-color: #C0392B40;">Scenario Comparison — Pay FBT vs Contribute<\/div>' +
+'<table><thead><tr><th>Metric<\/th><th class="r">A: Pay FBT<\/th><th class="r">B: Contribute<\/th><th class="r">Difference<\/th><\/tr><\/thead><tbody>' +
+'<tr><td>FBT Payable<\/td><td class="r red">' + fmtDec(results.fbtNoContrib) + '<\/td><td class="r green">' + fmtDec(results.fbtWithContrib) + '<\/td><td class="r green bold">' + fmtDec(results.fbtSaved) + '<\/td><\/tr>' +
+'<tr><td>Employee After-Tax Cost<\/td><td class="r">$0.00<\/td><td class="r">' + fmtDec(results.afterTaxCostOfContrib) + '<\/td><td class="r">' + fmtDec(-results.afterTaxCostOfContrib) + '<\/td><\/tr>' +
+'<tr><td>Pre-Tax Salary Equivalent<\/td><td class="r">$0.00<\/td><td class="r">' + fmtDec(results.preTaxEquivalent) + '<\/td><td class="r">—<\/td><\/tr>' +
+'<tr><td>Reportable FBT<\/td><td class="r">' + fmtDec(results.reportableFBTNoContrib) + '<\/td><td class="r">' + fmtDec(results.reportableFBTWithContrib) + '<\/td><td class="r green">' + fmtDec(results.reportableFBTNoContrib - results.reportableFBTWithContrib) + '<\/td><\/tr>' +
+'<tr><td>Vehicle Tax Deductions<\/td><td class="r">' + fmtDec(results.totalDeductibleNoContrib) + '<\/td><td class="r">' + fmtDec(results.totalDeductible) + '<\/td><td class="r">—<\/td><\/tr>' +
+'<tr><td>Company Tax Benefit<\/td><td class="r">' + fmtDec(results.companyTaxBenefitNoContrib) + '<\/td><td class="r">' + fmtDec(results.companyTaxBenefit) + '<\/td><td class="r">—<\/td><\/tr>' +
+'<tr><td>GST on Contributions<\/td><td class="r">$0.00<\/td><td class="r">' + fmtDec(results.gstOnContrib) + '<\/td><td class="r">—<\/td><\/tr>' +
+'<\/tbody><\/table>' +
+
+'<div class="insight-box" style="background: ' + (results.marginalRate < FBT_RATE ? "#f0fff4" : "#fffff0") + '; border: 1px solid ' + (results.marginalRate < FBT_RATE ? "#c6f6d5" : "#fefcbf") + ';">' +
+'<div style="font-size: 10px; font-weight: 700; color: ' + (results.marginalRate < FBT_RATE ? "#276749" : "#975a16") + '; margin-bottom: 4px;">Key Insight<\/div>' +
+'<div style="font-size: 9.5px; color: ' + (results.marginalRate < FBT_RATE ? "#2f855a" : "#744210") + '; line-height: 1.6;">' + insight + '<\/div><\/div>' +
+'<div class="footer">Illustrative only — not financial or tax advice. ATO rates for FBT year ending 31 March 2026. &copy; Acebiz — C&amp;S Partners Australia Pty Ltd<\/div><\/div>' +
+
+// PAGE 3
+'<div class="page"><div class="header"><div class="wordmark">Ace<span class="biz">biz<\/span><\/div>' +
+'<div class="firm">C&amp;S Partners Australia Pty Ltd · Tax Agent<\/div>' +
+'<h1>Contribution Optimizer<\/h1>' +
+'<div class="sub">FBT Car Benefit Analysis — ' + now + '<\/div><\/div>' +
+'<div style="font-size: 9px; color: #718096; margin-bottom: 10px;">Net Cost = Employee contribution + FBT payable − company vehicle tax benefit. Depreciation capped at ATO limit (' + fmt(results.depreciableBaseCapped) + ' ex-GST).<\/div>' +
+'<table><thead><tr><th class="r">Monthly<\/th><th class="r">Annual<\/th><th class="r">Taxable Value<\/th><th class="r">FBT Payable<\/th><th class="r">FBT Saved<\/th><th class="r">Vehicle Tax Benefit<\/th><th class="r">Net Cost<\/th><\/tr><\/thead><tbody>' +
+optRowsHtml +
+'<\/tbody><\/table>' +
+'<div class="section-title" style="color: #718096; border-color: #71809640; margin-top: 20px;">Quick Reference — FBT Year 2025-26<\/div>' +
+'<div class="two-col">' +
+'<div class="ref-box"><div class="ref-title">FBT Rates<\/div><div class="ref-body">FBT Rate: <strong>47%<\/strong><br/>Statutory Rate: <strong>20%<\/strong><br/>Type 1 Gross-Up: <strong>2.0802<\/strong><br/>Type 2 Gross-Up: <strong>1.8868<\/strong><\/div><\/div>' +
+'<div class="ref-box"><div class="ref-title">Key Limits<\/div><div class="ref-body">Car Depreciation Limit: <strong>' + fmt(ATO_CAR_LIMIT) + '<\/strong><br/>Max GST Credit: <strong>' + fmt(Math.round(ATO_CAR_LIMIT / 11)) + '<\/strong><br/>EV Exempt Threshold: <strong>$91,387<\/strong><br/>Contributions must be after-tax<\/div><\/div>' +
+'<\/div>' +
+'<div class="footer" style="margin-top: 24px;">Illustrative only — not financial or tax advice. ATO rates for FBT year ending 31 March 2026. &copy; Acebiz — C&amp;S Partners Australia Pty Ltd<\/div><\/div>' +
+'<\/body><\/html>';
+
+  var printWindow = window.open("", "_blank");
+  if (printWindow) {
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.onload = function () { setTimeout(function () { printWindow.print(); }, 400); };
+  } else {
+    var blob = new Blob([html], { type: "text/html" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = "FBT_Car_Benefit_Analysis.html";
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+  }
+}
+
+function doPDF() {
+  var btn = document.getElementById("pdfBtn");
+  var txt = document.getElementById("pdfBtnText");
+  btn.disabled = true; txt.textContent = "Generating...";
+  try {
+    var s = state;
+    generatePDF(
+      { carValue: s.carValue, upfrontPayment: s.upfront, daysAvailable: s.days, daysAtPremises: s.daysAtPremises,
+        carAge: s.carAge, isEV: s.isEV, gstCreditable: s.gstCred, annualContrib: s.aContrib, monthlyContrib: s.aContrib / 12,
+        thirdPartyExpenses: s.tpExp, employeeSalary: s.salary, annualRunning: s.running, annualInterest: s.interest,
+        depMethod: s.depM, isBaseTier: s.isBRE },
+      window.__R, window.__optRows
+    );
+  } catch (e) {
+    console.error("PDF error:", e);
+    alert("PDF export failed: " + e.message);
+  }
+  btn.disabled = false; txt.textContent = "Export to PDF";
+}
+
+/* ═══════════════ INIT ═══════════════ */
+document.getElementById("pdfBtn").addEventListener("click", doPDF);
+buildTabs();
+bindInputs();
+render();
+</script>
+</body>
+</html>
