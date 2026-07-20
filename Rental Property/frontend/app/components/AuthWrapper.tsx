@@ -20,6 +20,15 @@ export default function AuthWrapper({ children, navBar }: AuthWrapperProps) {
     };
 
     checkAuth();
+
+    // Listen for storage changes (logout from another tab/window)
+    const handleStorageChange = () => {
+      const auth = localStorage.getItem('acebiz_authenticated');
+      setIsAuthenticated(auth === 'true');
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   if (isLoading) {
@@ -39,7 +48,10 @@ export default function AuthWrapper({ children, navBar }: AuthWrapperProps) {
   if (!isAuthenticated) {
     return (
       <PasswordAuth
-        onAuthenticated={() => setIsAuthenticated(true)}
+        onAuthenticated={() => {
+          setIsAuthenticated(true);
+          localStorage.setItem('acebiz_authenticated', 'true');
+        }}
       />
     );
   }

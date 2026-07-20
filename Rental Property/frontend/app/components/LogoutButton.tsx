@@ -9,7 +9,11 @@ export default function LogoutButton() {
   const handleLogout = () => {
     localStorage.removeItem('acebiz_authenticated');
     toast.success('Logged out successfully');
-    router.refresh();
+
+    // Force page reload to trigger AuthWrapper check
+    setTimeout(() => {
+      window.location.href = '/';
+    }, 500);
   };
 
   return (

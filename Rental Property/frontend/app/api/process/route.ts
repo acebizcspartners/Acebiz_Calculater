@@ -189,11 +189,17 @@ IMPORTANT:
       .map((block: any) => block.text)
       .join('');
 
-    // Clean and parse JSON
-    const cleanedResponse = responseText
+    // Clean and parse JSON - handle extra text after JSON
+    let cleanedResponse = responseText
       .replace(/```json\n?/g, '')
       .replace(/```\n?/g, '')
       .trim();
+
+    // Extract only the JSON portion (handles cases where Claude adds notes after JSON)
+    const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      cleanedResponse = jsonMatch[0];
+    }
 
     console.log(`Claude response for ${file.name} (first 500 chars):`, cleanedResponse.substring(0, 500));
 
